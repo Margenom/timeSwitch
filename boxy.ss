@@ -1,12 +1,15 @@
 ;libs
 (load "rex.ss")
-(load "string.ss")
 
 ;globals
 
 ;functions
 (define (print . strs) (map display strs) (newline))
 (define (print-help) (print "help"))
+(define (string-split str sep) (let rec((ost (string->list str)) (word '()) (out '()))
+	(if (null? ost) (reverse out)
+		(rec (cdr ost) (if (member (car ost) (string->list sep)) '() (cons (car ost) word)) 
+			(if (member (car ost) (string->list sep)) (cons (list->string (reverse word)) out) out)))))
 (define*(need-args? off required optional . params) (define leng (- (length CLI_ARGS) off))
 	(print off 'v required 'b optional	)
 	(and (apply and (map (lambda(p) (member p (map car CLI_PARAMS))) params)) (>= (+ (if optional optional leng) required) leng required)))
@@ -15,17 +18,22 @@
 (define now_test #(1 2 3 4 5 6 7))
 (define (bisy-parse-line line) (define iform "((?:(?:\\d\\d?,)*(?:\\d\\d?)|\\*|\\d\\d?-\\d\\d?)(?:/\\d\\d?)?)\\s+")
 	(define daln (rex-matchl? line "^" iform iform iform iform iform "(\\d+)\\s(.+)$"))
-	(define*(asnum nums key ifnil (getter rex-sub)) ((lambda(p) (if (= 0 (string-length p)) ifnil (string->number p))) (getter nums key)))
+	(define*(asnum nums key ifnil (getter rex-sub)) ((lambda(p) (if (= 0 (string-length p)) 
+		(if ifnil ifnil (print "bisy-parse-line asnum null")) (string->number p))) (getter nums key)))
 	(if daln (let rec((dls (rex-list-nums daln)) (out '()) (tm #f) (itr 0))
-		(if (null? dls) out (begin (rec (cdr dls) (cons (cond
-			  ((set! tm (rex-match? "^((?:\\d\\d?,)*)(\\d\\d?)(?:/(\\d\\d?))?$" (car dls))) (print (rex-list-nums tm))
-			) ((set! tm (rex-match? "^(\\d\\d?)-(\\d\\d?)(?:/(\\d\\d?))?$" (car dls))) (print (rex-list-nums tm))
-				;(do ((b (min (asnum tm 1 0) (asnum tm 2 0)) (+ b 1)) 
-				;		(inr '() (if (= 0 (modulo b (asnum tm 3 b))) (cons b (inr)) inr)))
-				;	((= b (max (asnum tm 1 59) (asnum tm 2 59))) inr))
-			) ((set! tm (rex-match? "^\\*(?:/(\\d\\d?))?$" (car dls))) (print (rex-list-nums tm))
-				((lambda(now) (= 0 (modulo now (asnum tm 1 now)))) (vector-ref now_test (- itr 1)))
-			) ((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (print (rex-list-nums tm))
+		(if (null? dls) (cdr (reverse out)) (begin (rec (cdr dls) (cons (cond
+			  ((set! tm (rex-match? "^((?:\\d\\d?,)*)(\\d\\d?)$" (car dls)))
+				(let*((digstr (rex-sub tm 1)) (digend (list (rex-sub tm 2))) (digits (map string->number 
+						(if (string=? "" digstr) digend (append (string-split digstr ",") digend)))))
+					(lambda(now) (member now digits)))
+			) ((set! tm (rex-match? "^(\\d\\d?)-(\\d\\d?)(?:/(\\d\\d?))?$" (car dls)))
+				(do ((b (min (asnum tm 1 0) (asnum tm 2 0)) (+ b 1)) 
+						(inr '() (if (= 0 (modulo b (asnum tm 3 b))) (cons b inr) inr)))
+					((> b (max (asnum tm 1 59) (asnum tm 2 59)))
+						(lambda(now) (member now inr)))) ; (vector-ref now_test (- itr 1)))))
+			) ((set! tm (rex-match? "^\\*(?:/(\\d\\d?))?$" (car dls)))
+				(lambda(now) (= 0 (modulo now (asnum tm 1 now)))) ;(vector-ref now_test (- itr 1)))
+			) ((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (string->number (car dls))
 			) ((= itr 7) (car dls) 
 			) (else (print (car dls) " " itr))) out) tm (+ 1 itr)))))))
 
@@ -44,13 +52,13 @@
 (newline)
 
 
-(print (map bisy-parse-line '(
+(map print (map bisy-parse-line '(
 	"23 */2 * * * 1032 'Выполняется в 0:23, 2:23, 4:23 и т. д.'"
 	"5 4 * * 2 1032 'Выполняется в 4:05 в воскресенье'"
 	"* 0 1 1 * 1032 'С новым годом!'"
 	"15 10,13 * * 1,4 1032 'Эта надпись выводится в понедельник и четверг в 10:15 и 13:15'"
 	"0-59 * * */44 * 1032 'Выполняется ежеминутно'"
-	"0-59/2 * * * * 1032 'Выполняется по чётным минутам'"
+	"0-59/2 * 3,4,5,23 * * 1032 'Выполняется по чётным минутам'"
 	"1-59/2 * * * * 1032 'Выполняется по нечётным минутам'"
 )))
 
