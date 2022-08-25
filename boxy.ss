@@ -20,22 +20,27 @@
 	(define daln (rex-matchl? line "^" iform iform iform iform iform "(\\d+)\\s(.+)$"))
 	(define*(asnum nums key ifnil (getter rex-sub)) ((lambda(p) (if (= 0 (string-length p)) 
 		(if ifnil ifnil (print "bisy-parse-line asnum null")) (string->number p))) (getter nums key)))
+	(define (tester razr) (lambda(val) (let*(
+			(upper (vector-ref #(59 23 31 12 7 1440) (- razr 1)))
+			(lower (vector-ref #( 0  0  1  1 0    0) (- razr 1)))
+			(ranged (min (max lower val) upper)))
+		(unless (= val ranged) (print "in " line "\n\tunranged value: " val " (" lower "," upper "), " ranged  " used"))ranged)))
 	(if daln (let rec((dls (rex-list-nums daln)) (out '()) (tm #f) (itr 0))
 		(if (null? dls) (cdr (reverse out)) (begin (rec (cdr dls) (cons (cond
 			  ((set! tm (rex-match? "^((?:\\d\\d?,)*)(\\d\\d?)$" (car dls)))
 				(let*((digstr (rex-sub tm 1)) (digend (list (rex-sub tm 2))) (digits (map string->number 
 						(if (string=? "" digstr) digend (append (string-split digstr ",") digend)))))
-					(lambda(now) (member now digits)))
+					(lambda(now) (member now (map (tester itr) digits))))
 			) ((set! tm (rex-match? "^(\\d\\d?)-(\\d\\d?)(?:/(\\d\\d?))?$" (car dls)))
 				(do ((b (min (asnum tm 1 0) (asnum tm 2 0)) (+ b 1)) 
 						(inr '() (if (= 0 (modulo b (asnum tm 3 b))) (cons b inr) inr)))
 					((> b (max (asnum tm 1 59) (asnum tm 2 59)))
-						(lambda(now) (member now inr)))) ; (vector-ref now_test (- itr 1)))))
+						(lambda(now) (member now (map (tester itr) inr))))) ; (vector-ref now_test (- itr 1)))))
 			) ((set! tm (rex-match? "^\\*(?:/(\\d\\d?))?$" (car dls)))
-				(lambda(now) (= 0 (modulo now (asnum tm 1 now)))) ;(vector-ref now_test (- itr 1)))
-			) ((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (string->number (car dls))
+				(lambda(now) (= 0 (modulo now ((tester itr) (asnum tm 1 now))))) ;(vector-ref now_test (- itr 1)))
+			) ((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) ((tester itr) (string->number (car dls)))
 			) ((= itr 7) (car dls) 
-			) (else (print (car dls) " " itr))) out) tm (+ 1 itr)))))))
+			) (else #f)) out) tm (+ 1 itr)))))))
 
 ;main
 (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
