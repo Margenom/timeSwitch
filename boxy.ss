@@ -14,21 +14,26 @@
 
 ;globals
 (define Busy (filter values (map busy-parse-line (read-lines BusyFile))))
-;(map print Busy)
 
+;fakes
+(define (donelog-part-get-last) (list 345636534))
+(define (donelog-append-begin busy) (print "<" (clock-seconds) "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))
+(define (donelog-append-end comment) (print ">" (clock-seconds) "\t" comment))
+(define (donelog-append-head) (display "\t") (display (clock-seconds)))
+(define (donelog-append-tail . mesg) (print "\t" (clock-seconds) "\t" (apply string-join " " mesg)))
+(define (busy-now-filter busy) busy)
+
+(define time (clock-seconds))
+(define tm (clock time))
+(print (list time tm (clock-format "%d%M" tm)))
+
+;(map print Busy)
+;(display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
 (define (print-help) (with-input-from-file (BoxyHome "README.txt") (lambda()
 	(do ((ln (read-line) (read-line))) ((equal? ln #<eof>)) (print ln)))))
 
 ;main
 (define (args-check need) (unless (need-args? 2 (or need 0) (if need 0 #f)) (begin (print-help) (exit))))
-(define (donelog-part-get-last) (list 345636534))
-(define (donelog-append-begin busy) (print "<" (time-seconds) "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))
-(define (donelog-append-end comment) (print ">" (time-seconds) "\t" comment))
-(define (donelog-append-head) (display "\t") (display (time-seconds)))
-(define (donelog-append-tail . mesg) (print "\t" (time-seconds) "\t" (apply string-join " " mesg)))
-(define (busy-now-filter busy) busy)
-
-(display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
 (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
 ;planed
 	((select) (args-check 1) 

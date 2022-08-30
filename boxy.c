@@ -3,103 +3,64 @@
 #include <stdint.h>
 #include <string.h>
 #include <s7.h>
+#include <time.h>
 
 /* subs */
 #include "rex.c"
 #include "io.c"
-/*
-s7_pointer boxy_log_scan(s7_scheme *sc, s7_pointer args) {
-	FILE *fp = fopen(s7_string(s7_car(args)), "r");
-	if (!fp) return s7_f(sc);
 
-	fseek(fp, 0l, seek_end);
-	long file_size = ftell(fp);
-	fseek(fp, 0l, seek_set);
+s7_pointer clock_seconds(s7_scheme *sc, s7_pointer a) {return s7_make_integer(sc, time(NULL));}
+s7_pointer clock_vec(s7_scheme *sc, s7_pointer a) {
+	time_t tnow = time(NULL);
+	
+	if (s7_list_length(sc, a) >0 && s7_is_integer(s7_car(a)))
+		tnow = s7_integer(s7_car(a));
 
-	char*buf = malloc(file_size);
-	if(0>fread(buf, file_size, 1, fp)) {
-		free(buf);
-		fclose(fp);
-		return s7_f(sc);
-	}
+	int localorgm = 1;
+	if (s7_list_length(sc, a) >1 && s7_is_boolean(s7_cadr(a)))
+		localorgm = s7_boolean(sc, s7_cadr(a));
+	struct tm *tgrid = (localorgm?localtime:gmtime)(&tnow);
+		
+	int itr =0;
+	s7_pointer out = s7_make_vector(sc, 9);
 
-	s7_pointer out = s7_make_string(sc, buf);
-	free(buf);
-	fclose(fp);
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_sec));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_min));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_hour));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_mday));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_mon));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_year));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_wday));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_yday));
+	s7_vector_set(sc, out, itr++, s7_make_integer(sc, tgrid->tm_isdst));
+
 	return out;
 }
-
-s7_pointer boxy_log_store_head(s7_scheme *sc, s7_pointer args) {
-	FILE *fp = fopen(s7_string(s7_car(args)), "a");
-	if (!fp) return s7_f(sc);
-	fprintf(fp, "%d\t", s7_number(s7_car(args)));
-	fclose(fp);
-	return s7_number(s7_car(args));
-}
-*/
-/*
-s7_pointer boxy_log_scan_last(s7_scheme *sc, s7_pointer args) {
-	FILE *fp = fopen(s7_string(s7_car(args)), "r");
-	if (!fp) return s7_f(sc);
-
-	int ch;
-	long line, linebef;
-	while((ch = fgetc(fp)) != EOF) {
-		if (ch == '\n') {
-			linebef = line;
-			line = ftell(fp);
-		}
-	}
-	long file_end = ftell(fp);
-
-	s7_pointer out = s7_cons(sc, s7_make_boolean(sc, 
+s7_pointer clock_format(s7_scheme *sc, s7_pointer a) {
+	if (s7_list_length(sc, a) ==0 || !s7_is_string(s7_car(a))) return s7_f(sc);
+	const char *format = s7_string(s7_car(a));
 	
+	s7_pointer tm;
+	if (s7_list_length(sc, a) >1 && s7_is_vector(s7_cadr(a))) { tm = s7_cadr(a); }
+	else tm = clock_vec(sc, s7_nil(sc));
+		
+	int itr =0;
+	struct tm tgrid;
 
-	fseek(fp, 0l, seek_set);
+	tgrid.tm_sec = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_min = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_hour = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_mday = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_mon = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_year = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_wday = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_yday = s7_integer(s7_vector_ref(sc, tm, itr++));
+	tgrid.tm_isdst = s7_integer(s7_vector_ref(sc, tm, itr++));
 
-	char*buf = malloc(file_size);
-	if(0>fread(buf, file_size, 1, fp)) {
-		free(buf);
-		fclose(fp);
-		return s7_f(sc);
-	}
-
-	s7_pointer out = s7_make_string(sc, buf);
-	free(buf);
-	fclose(fp);
-	return out;
+	char buf[64];
+	if (!strftime(buf, 63, format, &tgrid)){ return s7_f(sc); }
+	else return s7_make_string(sc, buf);
 }
-*/
-/*
-s7_pointer boxy_log_store_about(s7_scheme *sc, s7_pointer args) {
-	FILE *fp = fopen(s7_string(s7_car(args)), "r");
-	fseek(fp, 0l, seek_end);
-	long file_size = ftell(fp);
-	if (file_size == 0) {fclose(fp); return s7_f(sc);}
-	fseek(fp, (file_size-19 <0)?0:file_size-19, seek_set);
-	
-	long start
-
-	char buf[20];
-	if(0>(file_size =fread(buf, 19, 1, fp))) {
-		free(buf);
-		fclose(fp);
-		return s7_f(sc);
-	}
-	if (file_size == 19) {
-		char*t = strrchr(buf, '\n')+1;
-
-	s7_pointer out = s7_make_string(sc, buf);
-
-	s
-	if (!fp) return s7_f(sc);
-	fprintf(fp, "%d\t%s", s7_number(s7_car(args)), s7_string(s7_car(args)));
-	fclose(fp);
-	return s7_number(s7_car(args));
-}
-*/
-
-s7_pointer time_seconds(s7_scheme *sc, s7_pointer a) {return s7_make_integer(sc, time(NULL));}
 
 
 int main(int argc, char *argv[]) {
@@ -107,7 +68,9 @@ int main(int argc, char *argv[]) {
 //subs
 	rex(sc);
 	io(sc);
-	s7_define_function(sc, "time-seconds", time_seconds,  0, 0, 0, "(time_seconds)");
+	s7_define_function(sc, "clock", clock_vec,  0, 2, 0, "(clock [unix time] [local(def) time or UTC]): #(sec min hour mday mon year wday yday isdst)");
+	s7_define_function(sc, "clock-format", clock_format,  1, 1, 0, "(clock <strftime format> [time vec from (clock)]): string or #f");
+	s7_define_function(sc, "clock-seconds", clock_seconds,  0, 0, 0, "(clock_seconds): utime");
 
 	s7_pointer params = s7_nil(sc),
 		data = s7_nil(sc);
