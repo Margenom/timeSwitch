@@ -99,13 +99,15 @@ s7_pointer boxy_log_store_about(s7_scheme *sc, s7_pointer args) {
 }
 */
 
+s7_pointer time_seconds(s7_scheme *sc, s7_pointer a) {return s7_make_integer(sc, time(NULL));}
+
 
 int main(int argc, char *argv[]) {
 	s7_scheme *sc = s7_init();
 //subs
 	rex(sc);
 	io(sc);
-//	s7_define_function(sc, "io-read-file", io_read_file,  1, 0, 0, "(io-read-file file)");
+	s7_define_function(sc, "time-seconds", time_seconds,  0, 0, 0, "(time_seconds)");
 
 	s7_pointer params = s7_nil(sc),
 		data = s7_nil(sc);
