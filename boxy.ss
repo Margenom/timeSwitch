@@ -23,9 +23,8 @@
 (define (donelog-append-tail . mesg) (print "\t" (clock-seconds) "\t" (apply string-join " " mesg)))
 (define (busy-now-filter busy) busy)
 
-(define time (clock-seconds))
-(define tm (clock time))
-(print (list time tm (clock-format "%d%M" tm)))
+;(define time (clock-seconds)) (define tm (clock time)) (print (list time tm (clock-format "%d%M" tm)))
+;(with-output-to-file-append "/tmp/test.t" (lambda()(print 453 4  5 4 3 36 'sndfl )))
 
 ;(map print Busy)
 ;(display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
