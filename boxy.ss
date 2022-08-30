@@ -16,11 +16,6 @@
 (define Busy (filter values (map busy-parse-line (read-lines BusyFile))))
 
 ;fakes
-(define (donelog-part-get-last) (list 345636534))
-(define (donelog-append-begin busy) (print "<" (clock-seconds) "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))
-(define (donelog-append-end comment) (print ">" (clock-seconds) "\t" comment))
-(define (donelog-append-head) (display "\t") (display (clock-seconds)))
-(define (donelog-append-tail . mesg) (print "\t" (clock-seconds) "\t" (apply string-join " " mesg)))
 (define (busy-now-filter busy) busy)
 
 ;(define time (clock-seconds)) (define tm (clock time)) (print (list time tm (clock-format "%d%M" tm)))
@@ -36,23 +31,23 @@
 (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
 ;planed
 	((select) (args-check 1) 
-		(donelog-append-begin (list-ref (busy-now-filter Busy) (string->number (list-ref CLI_ARGS 2)))) 
+		(donelog-append-begin (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
 	)((list)  (args-check 0)
-		(do ((i 0 (+ i 1)) (ost (busy-now-filter Busy) (cdr ost))) ((null? ost))
-			(print i ":\t" (list-ref (car ost) 6)))
+		(do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
+			(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6)))
 	)((timer) (args-check #f) ;system command
 		(print (apply string-join " " (cddr CLI_ARGS)))
 	)((end) (args-check #f) ;comment
 ;		(let ((time_begin (donelog-part-get-last)
 		(print (apply string-join " " (cddr CLI_ARGS)))
 ;unplaned
-	)((stun)(args-check 0) (donelog-append-head)
+	)((stun)(args-check 0) (donelog-append-head DoneLogFile)
 	)((tell)(args-check #f) ;mesg
-		(donelog-append-tail (cddr CLI_ARGS))
+		(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
 	)((wait)(args-check #f) ;mesg
-		(donelog-append-head)
-		(read-line)
-		(donelog-append-tail (cddr CLI_ARGS))
+		(donelog-append-head DoneLogFile)
+		(read)
+		(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
 ;other
 	)((stat) (args-check 0) ;pattern match
 		(print (donelog-uncomplite (map donelog-parse-line (donelog-load))))

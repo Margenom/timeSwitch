@@ -44,6 +44,12 @@
 			) (else #f)))
 		) (rec (cdr dls) (cons value out) tm (+ 1 itr)))))))
 
+; brud forse
+;(define*(busy-filter-range Busy range (now (clock-seconds)))
+;	(define (busy-test? rec utime) 
+;		(apply and (map member (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)) rec)))
+;	(do ((ost Busy (cdr ost)) (dif (car range) (+ 1 dif)) (out '() (cons 
+
 ;	busy file
 (define (test)
 (map print (map busy-parse-line '(

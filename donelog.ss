@@ -42,7 +42,17 @@
 	(- (donelog-record-length record) (cadar rec)))
 
 ;io 
-(define (donelog-load DLfile) (map (lambda(l) (donelog-parse-line l #t)) (read-lines DLfile)))
+(define*(donelog-load DLfile (allow_partline #t)) 
+	(map (lambda(l) (donelog-parse-line l allow_partline)) (read-lines DLfile)))
+(define*(donelog-append-begin DLfile busy (now (clock-seconds))) 
+	(with-output-to-file-append DLfile (lambda() 
+		(print "<" now "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))))
+(define*(donelog-append-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
+	(map display (list "\t"now)))))
+(define*(donelog-append-teil DLfile mesg (now (clock-seconds))) 
+	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
+(define*(donelog-append-end DLfile comment (now (clock-seconds))) 
+	(with-output-to-file-append DLfile (lambda() (print ">" now "\t" comment))))
 
 (define (test)
 ;	log file, record consist from:

@@ -9,7 +9,6 @@
 #include "io.c"
 #include "time_clock.c"
 
-
 int main(int argc, char *argv[]) {
 	s7_scheme *sc = s7_init();
 //subs

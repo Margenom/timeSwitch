@@ -29,3 +29,5 @@
 ;primitive repl
 (define (repl) (do ((Ln "REPL" (read)) (i 0 (+ i 1))) ((eq? Ln #<eof>) (display "Bye..\n"))
 	(write (eval Ln)) (newline) (display i) (display "> ")))
+
+(define*(clock-pretty utime (format "%a %d.%m (%Y) %H:%M")) (clock-format format (clock utime))) 
