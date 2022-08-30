@@ -32,3 +32,10 @@
 		(values (cons (string->symbol (string-append "$" key)) (string-sub (match 1) interv (match 2)))
 			(cons (string->symbol (string-append "i" key)) interv))))
 	(rex-list match))))
+
+;test
+(define (test)
+(define rexs (map (lambda(k) (rex-match? "(\\d)(?<tst>\\d)?(\\d)?" k)) '("123" "12" "3")))
+(print rexs)
+(map print (map rex-list rexs))
+)
