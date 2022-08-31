@@ -17,13 +17,13 @@
 (define*(donelog-agregate parsed (allow_free #f) (allow_partline #f) (allow_uncomplited #f))
 	(let rec((ost parsed) (out '()) (waits '()) (head #f))
 		(if (null? ost) (reverse (if (and allow_uncomplited head) 
-				(cons (list 'uncomplited head (reverse waits)) out) out))
+				(cons (list 'proc head (reverse waits)) out) out)) ; like processing
 			(if (car ost) (case (string-ref (caar ost) 0)
 				((#\tab) (let*((upl_length (- (caddar ost) (cadar ost))) (upl (list (cadar ost) upl_length  (cdddar ost))))
 				(rec (cdr ost) (if (and allow_free (not head)) (cons (cons 'free upl) out) out) (if (> 0 upl_length) waits (cons upl  waits)) head))
 				; begin
 				) ((#\<) (rec (cdr ost) (if (and allow_uncomplited head) 
-					(cons (list 'uncomplited head (reverse waits)) out)
+					(cons (list 'proc head (reverse waits)) out)
 					out) '() (cdar ost))
 				; end
 				) ((#\>) (rec (cdr ost) (cons (list 'rec head (reverse waits) (cdar ost)) out) '() #f)
@@ -47,10 +47,14 @@
 	(- (donelog-record-length record) (cadar rec)))
 
 ;io 
-(define (donelog-pretty-print recs)
-	(if (null? recs) recs (begin
-		(apply print (map (lambda(t) (values t "\t")) (car recs)))
-		(donelog-pretty-print (cdr recs)))))
+(define (donelog-pretty-print agrd)
+	(if (null? agrd) agrd (let ((agr (car agrd))) (case (car agr)
+			((rec) (print agr))
+			((part) (print agr))
+			((free) (print agr))
+			((proc) (map print agr))
+			(else (print agr)))
+		(donelog-pretty-print (cdr agrd)))))
 (define*(donelog-load DLfile (allow_partline #t)) 
 	(map (lambda(l) (donelog-parse-line l allow_partline)) (read-lines DLfile)))
 (define*(donelog-append-begin DLfile busy (now (clock-seconds))) 

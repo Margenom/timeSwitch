@@ -1,3 +1,5 @@
+(set! *load-path* (cons CLI_PATH *load-path*))
+
 ;libs
 (load "rex.ss")
 
@@ -20,7 +22,7 @@
 ;(with-output-to-file-append "/tmp/test.t" (lambda()(print 453 4  5 4 3 36 'sndfl )))
 
 ;(map print Busy)
-;(display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
+(display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
 (define (print-help) (with-input-from-file (BoxyHome "README.txt") (lambda()
 	(do ((ln (read-line) (read-line))) ((equal? ln #<eof>)) (print ln)))))
 

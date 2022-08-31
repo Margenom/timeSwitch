@@ -9,13 +9,31 @@
 #include "io.c"
 #include "time_clock.c"
 
+#define BOXY_SCRIPT "/boxy.ss"
+
+// return allocated memory
+char* exe_path(int pid, int no_realpath) {
+	char* procdir = NULL;
+	asprintf(&procdir, "/proc/%d/exe", pid);
+
+	if (no_realpath) return procdir;
+	
+	char *realexe = realpath(procdir, NULL);
+	free(procdir);
+	return realexe;
+}
+
 int main(int argc, char *argv[]) {
+	int pid = getpid();
+	char* load_script = exe_path(pid, 0);
 	s7_scheme *sc = s7_init();
-//subs
+
+// init subs
 	rex(sc);
 	io(sc);
 	time_clock(sc);
 
+{ // init globals variables
 	s7_pointer params = s7_nil(sc),
 		data = s7_nil(sc);
 	for (int i=0; i <argc; i++) {
@@ -30,14 +48,19 @@ int main(int argc, char *argv[]) {
 	}
 	s7_define_variable(sc, "CLI_PARAMS", s7_reverse(sc, params));
 	s7_define_variable(sc, "CLI_ARGS", s7_reverse(sc, data));
-	char *path = realpath(argv[0], NULL), *sep;
-	sep = strrchr(path, '/');
-	s7_define_variable(sc, "CLI_PATH", s7_make_string_with_length(sc, path, sep?sep-path:strlen(path)));
-	s7_define_variable(sc, "CLI_EXEC", s7_make_string(sc, sep? sep+1: path));
+	s7_define_variable(sc, "CLI_EXEC", s7_make_string(sc, argv[0]));
+	char *path = load_script, *sep = strrchr(load_script, '/');
+	load_script = strndup(path, sep?sep-path:strlen(path));
 	free(path);
+	s7_add_to_load_path(sc, load_script); 
+	s7_define_variable(sc, "CLI_PATH", s7_make_string(sc, load_script));
+}
+// end init
 
-	if (!s7_load(sc, "boxy.ss"))
+	load_script = realloc(load_script, strlen(load_script)+ strlen(BOXY_SCRIPT)+1);
+	if (!s7_load(sc, strcat(load_script, BOXY_SCRIPT)))
 		s7_repl(sc);
+	free(load_script);
 
 	return 0;
 }
