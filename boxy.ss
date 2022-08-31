@@ -28,30 +28,37 @@
 
 ;main
 (define (args-check need) (unless (need-args? 2 (or need 0) (if need 0 #f)) (begin (print-help) (exit))))
+(define (part-check) (if (donelog-part-check? DoneLogFile) (begin (print "boxy stuned") (exit))))
 (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
 ;planed
-	((select) (args-check 1) 
+	((select) (args-check 1) (part-check)
 		(donelog-append-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
 	)((list)  (args-check 0)
 		(do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
 			(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6)))
-	)((timer) (args-check #f) ;system command
+	)((timer) (part-check) (args-check #f) ;system command
 		(print (apply string-join " " (cddr CLI_ARGS)))
-	)((end) (args-check #f) ;comment
-;		(let ((time_begin (donelog-part-get-last)
-		(donelog-append-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
+	)((end) (part-check) (args-check #f) ;comment
+		(donelog-append-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
+	)((now) (args-check 0)
+	)((check) (args-check 0) 
 ;unplaned
-	)((stun)(args-check 0) (donelog-append-head DoneLogFile)
-	)((tell)(args-check #f) ;mesg
+	)((stun) (part-check) (args-check 0) (donelog-append-head DoneLogFile)
+	)((tell) (args-check #f) ;mesg
 		(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
-	)((wait)(args-check #f) ;mesg
-		(donelog-append-head DoneLogFile)
-		(read)
-		(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
+	)((wait) (part-check) (args-check #f) ;mesg
+		(display "Stop C-c, in args or mesg: ")
+		(let*((start (param-or-val "t" (clock-seconds) string->number))
+				(inpstring (param-or-val "r" (read-line)))
+				(stop (param-or-val "l" (clock-seconds) (lambda(v) (+ start (string->number v)))))
+				(strnull? (lambda(str) (string=? str "")))
+				(storestring (if (null? (cddr CLI_ARGS)) inpstring (apply string-join " " (cddr CLI_ARGS)))))
+		(if (strnull? storestring) (begin (print "no mesg") (exit)) (begin
+			(write inpstring)
+			(donelog-append-head DoneLogFile start)
+			(donelog-append-tail DoneLogFile storestring stop))))
 ;other
 	)((stat) (args-check 0) ;pattern match
 		;(print (donelog-uncomplite (map donelog-parse-line (donelog-load DoneLogFile))))
 		(donelog-pretty-print (donelog-agregate (donelog-load DoneLogFile) #t #t #t))
-	)((check) (args-check 0) 
-	)((now) (args-check 0)
 	)(else (print-help)))

@@ -9,8 +9,8 @@
 				(cdr (rex-list-nums trms))))
 		((set! trms (rex-match? "^(>)(\\d+)\t(.+)$" line)) 
 			(map (lambda (f v) (f v)) (list values string->number values) (cdr (rex-list-nums trms))))
-		((and partline (set! trms (rex-match? "^(\t)(\\d+)$" line))) 
-			(list "p" (string->number (rex-sub tm 1))))
+		((and partline (set! trms (rex-match? "^\t(\\d+)$" line))) 
+			(list "p" (string->number (rex-sub trms 1))))
 		(else #f)))
 
 ; (head right) agregate parsed lines into records or part (uncomplited) or free (unplaned and unhead)
@@ -19,7 +19,7 @@
 		(if (null? ost) (reverse (if (and allow_uncomplited head) 
 				(cons (list 'proc head (reverse waits)) out) out)) ; like processing
 			(if (car ost) (case (string-ref (caar ost) 0)
-				((#\tab) (let*((upl_length (- (caddar ost) (cadar ost))) (upl (list (cadar ost) upl_length  (cdddar ost))))
+				((#\tab) (let*((upl_length (- (caddar ost) (cadar ost))) (upl (list (cadar ost) upl_length  (car (cdddar ost)))))
 				(rec (cdr ost) (if (and allow_free (not head)) (cons (cons 'free upl) out) out) (if (> 0 upl_length) waits (cons upl  waits)) head))
 				; begin
 				) ((#\<) (rec (cdr ost) (if (and allow_uncomplited head) 
@@ -35,16 +35,6 @@
 ; (head left) any from end
 (define (donelog-uncomplite parsed) (let rec((ost parsed) (out '()))
 	(if (or (null? ost) (and (car ost) (string=? (caar ost) ">"))) out (rec (cdr ost) (cons (car ost) out)))))
-;records
-(define (donelog-record rec) (and (eq? (car rec) 'rec) (cdr rec)))
-(define (donelog-record-length record)
-	(define rec (or (donelog-record record) record))
-	(define rec_begin (caar rec))
-	(define rec_end (caaddr rec))
-	(define rec_waits_length (apply + (map cadr (cadr rec)))))
-(define (donelog-record-planed-diff record) 
-	(define rec (or (donelog-record record) record))
-	(- (donelog-record-length record) (cadar rec)))
 
 ;io 
 (define (donelog-pretty-print agrd)
@@ -62,10 +52,25 @@
 		(print "<" now "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))))
 (define*(donelog-append-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
 	(map display (list "\t"now)))))
-(define*(donelog-append-teil DLfile mesg (now (clock-seconds))) 
+(define*(donelog-append-tail DLfile mesg (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
 (define*(donelog-append-end DLfile comment (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print ">" now "\t" comment))))
+
+;records
+(define (donelog-record rec) (and (eq? (car rec) 'rec) (cdr rec)))
+(define (donelog-record-length record)
+	(define rec (or (donelog-record record) record))
+	(define rec_begin (caar rec))
+	(define rec_end (caaddr rec))
+	(define rec_waits_length (apply + (map cadr (cadr rec)))))
+(define (donelog-record-planed-diff record) 
+	(define rec (or (donelog-record record) record))
+	(- (donelog-record-length record) (cadar rec)))
+;part
+(define (donelog-part-check? DLfile)
+	(define lst (reverse (donelog-load DLfile #t)))
+	(and (list? lst) (car lst) (string=? (caar lst) "p")))
 
 (define (test)
 ;	log file, record consist from:
