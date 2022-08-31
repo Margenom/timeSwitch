@@ -38,7 +38,8 @@
 	tell <описание что буду делать> [-t=<utime now>]
 		Запустить сщетчик перерыва (программа ждет прирывания)
 		возможно напаминапие раз в определенные промежутки времени о том что сейчас пауза.
-	wait [<описание что буду делать>] [-i=<interval, micro alarm>]
+		~Интервальный таймер
+	wait [<описание что буду делать>] [-t=<utime start>] [-l=<length in sec>] [-p=<messg>] 
 - Общие
 		Выводит статистику за время t по параметру s
 	~stat [-t=<time>] [-s=<stat tipe, by cat, by key, by priority, by context, by time(def)>] [-c=<category>, def all] [-<key>=<value>] [-p=<priority>] [-x=<context>]

@@ -60,5 +60,5 @@
 ;other
 	)((stat) (args-check 0) ;pattern match
 		;(print (donelog-uncomplite (map donelog-parse-line (donelog-load DoneLogFile))))
-		(donelog-pretty-print (donelog-agregate (donelog-load DoneLogFile) #t #t #t))
+		(donelog-pretty-print (donelog-agregate (donelog-load DoneLogFile #t) #t #t))
 	)(else (print-help)))

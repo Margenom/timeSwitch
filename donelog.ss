@@ -13,27 +13,27 @@
 			(list "p" (string->number (rex-sub trms 1))))
 		(else #f)))
 
-; (head right) agregate parsed lines into records or part (uncomplited) or free (unplaned and unhead)
-(define*(donelog-agregate parsed (allow_free #f) (allow_partline #f) (allow_uncomplited #f))
+; agregate parsed lines into records or part (uncomplited) or free (unplaned and unhead)
+(define*(donelog-agregate parsed (allow_free #f) (allow_processed #f))
 	(let rec((ost parsed) (out '()) (waits '()) (head #f))
-		(if (null? ost) (reverse (if (and allow_uncomplited head) 
+		(if (null? ost) (reverse (if (and allow_processed head) 
 				(cons (list 'proc head (reverse waits)) out) out)) ; like processing
 			(if (car ost) (case (string-ref (caar ost) 0)
 				((#\tab) (let*((upl_length (- (caddar ost) (cadar ost))) (upl (list (cadar ost) upl_length  (car (cdddar ost)))))
 				(rec (cdr ost) (if (and allow_free (not head)) (cons (cons 'free upl) out) out) (if (> 0 upl_length) waits (cons upl  waits)) head))
+				; part
+				)((#\p) (rec (cdr ost) (if (and allow_free (not head)) (cons (cons 'part (cdar ost)) out) out) (cons (cdar ost) waits) head)
 				; begin
-				) ((#\<) (rec (cdr ost) (if (and allow_uncomplited head) 
+				) ((#\<) (rec (cdr ost) (if (and allow_processed head) 
 					(cons (list 'proc head (reverse waits)) out)
 					out) '() (cdar ost))
 				; end
 				) ((#\>) (rec (cdr ost) (cons (list 'rec head (reverse waits) (cdar ost)) out) '() #f)
-				; part
-				) ((#\p) (rec (cdr ost) (if allow_partline (cons  (list 'part head (reverse (cons (cdar ost) waits)))out) out) waits head)
 				) (else (rec (cdr ost) out waits head))) 
 			(rec (cdr ost) out waits head)))))
 
-; (head left) any from end
-(define (donelog-uncomplite parsed) (let rec((ost parsed) (out '()))
+; any from end
+(define (donelog-uncomplite parsed) (let rec((ost (reverse parsed)) (out '()))
 	(if (or (null? ost) (and (car ost) (string=? (caar ost) ">"))) out (rec (cdr ost) (cons (car ost) out)))))
 
 ;io 
