@@ -51,7 +51,7 @@
 	(with-output-to-file-append DLfile (lambda() 
 		(print "<" now "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))))
 (define*(donelog-append-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
-	(map display (list "\t"now)))))
+	(map display (list "\t" now)))))
 (define*(donelog-append-tail DLfile mesg (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
 (define*(donelog-append-end DLfile comment (now (clock-seconds))) 

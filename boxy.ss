@@ -20,6 +20,17 @@
 ;fakes
 ;(define time (clock-seconds)) (define tm (clock time)) (print (list time tm (clock-format "%d%M" tm)))
 ;(with-output-to-file-append "/tmp/test.t" (lambda()(print 453 4  5 4 3 36 'sndfl )))
+(define (string-chomp str) 
+	(if (= 0 (string-length str)) "" 
+		(let ((rnd (rex-match? "^\\s*(.+)\\s*$" str)))
+			(print rnd (and rnd (rex-sub rnd 1)))
+			(if rnd (rex-sub rnd 1) ""))))
+;	(define spaces '(#\space #\newline #\tab))
+;	(do ((sfmark #t sfmark) (stmark #t stmark) 
+;			(subf 0 (+ subf (if (set! sfmark (member (string-ref str subf) spaces)) 1 0))) 
+;			(subt (string-length str) (- subt (if (set! stmark (member (string-ref str (- subt 1)) spaces)) 1 0))))
+;		((not (or sfmark stmark)) (substring str subf subt))
+;		)))
 
 ;(map print Busy)
 (display (list CLI_ARGS CLI_PARAMS CLI_PATH CLI_EXEC)) (newline)
@@ -33,30 +44,26 @@
 ;planed
 	((select) (args-check 1) (part-check)
 		(donelog-append-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
-	)((list)  (args-check 0)
-		(do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
+	)((list)  (args-check 0) (do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
 			(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6)))
 	)((timer) (part-check) (args-check #f) ;system command
 		(print (apply string-join " " (cddr CLI_ARGS)))
 	)((end) (part-check) (args-check #f) ;comment
 		(donelog-append-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
-	)((now) (args-check 0)
+	)((now) (args-check 0) (print (donelog-uncompited (donelog-load DoneLogFile #t)))
 	)((check) (args-check 0) 
 ;unplaned
 	)((stun) (part-check) (args-check 0) (donelog-append-head DoneLogFile)
-	)((tell) (args-check #f) ;mesg
-		(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
+	)((tell) (args-check #f) (donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
 	)((wait) (part-check) (args-check #f) ;mesg
 		(display "Stop C-c, in args or mesg: ")
 		(let*((start (param-or-val "t" (clock-seconds) string->number))
-				(inpstring (param-or-val "r" (read-line)))
+				(inpstring (param-or-val "r" (string-chomp (read-line))))
 				(stop (param-or-val "l" (clock-seconds) (lambda(v) (+ start (string->number v)))))
-				(strnull? (lambda(str) (string=? str "")))
-				(storestring (if (null? (cddr CLI_ARGS)) inpstring (apply string-join " " (cddr CLI_ARGS)))))
-		(if (strnull? storestring) (begin (print "no mesg") (exit)) (begin
-			(write inpstring)
+				(clistring (if (null? (cddr CLI_ARGS)) inpstring (apply string-join " " (cddr CLI_ARGS)))))
+		(if (string=? "" clistring) (begin (print "no mesg") (exit)) (begin
 			(donelog-append-head DoneLogFile start)
-			(donelog-append-tail DoneLogFile storestring stop))))
+			(donelog-append-tail DoneLogFile (if (string=? "" inpstring) inpstring clistring) stop))))
 ;other
 	)((stat) (args-check 0) ;pattern match
 		;(print (donelog-uncomplite (map donelog-parse-line (donelog-load DoneLogFile))))

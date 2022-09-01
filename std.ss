@@ -24,7 +24,7 @@
 (define*(need-args? off required optional . params) (define leng (- (length CLI_ARGS) off))
 ;	(print off 'r required 'o optional	) 
 	(and (apply and (map (lambda(p) (member p (map car CLI_PARAMS))) params)) (>= (+ (if optional optional leng) required) leng required)))
-(define*(param-or-val pname val (modif values)) ((lambda(p) (modif (if p (cdr p) val))) (assoc pname CLI_PARAMS)))
+(define*(param-or-val pname val (modif values)) ((lambda(p) (if p (modif (cdr p)) val)) (assoc pname CLI_PARAMS)))
 
 ;primitive repl
 (define (repl) (do ((Ln "REPL" (read)) (i 0 (+ i 1))) ((eq? Ln #<eof>) (display "Bye..\n"))
