@@ -39,6 +39,11 @@
 ;unplaned
 	)((stun) (part-check) (args-check 0) (donelog-append-head DoneLogFile)
 	)((tell) (args-check #f) (donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
+	)((next) (args-check #f) 
+		(let ((last (donelog-last-done DoneLogFile "\t")))
+			(unless last (begin (print "last is defenition") (exit)))
+			(donelog-append-head DoneLogFile (caddr last))
+			(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS))))
 	)((wait) (part-check) (args-check #f) ;mesg
 		(display "Stop C-c, in args or mesg: ")
 		(let*((start (param-or-val "t" (clock-seconds) string->number))

@@ -45,8 +45,10 @@
 			((proc) (map print agr))
 			(else (print agr)))
 		(donelog-pretty-print (cdr agrd)))))
+;load 
 (define*(donelog-load DLfile (allow_partline #t)) 
 	(map (lambda(l) (donelog-parse-line l allow_partline)) (read-lines DLfile)))
+;write 
 (define*(donelog-append-begin DLfile busy (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() 
 		(print "<" now "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))))
@@ -56,7 +58,16 @@
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
 (define*(donelog-append-end DLfile comment (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print ">" now "\t" comment))))
+;spec
+(define*(donelog-last-done DLfile (type #f) (full #f))
+	(define lst (reverse (donelog-load DLfile #t)))
+	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))
 
+;any with recordes complited uncomplited free, but parsed
+(define (donelog-befois-check? DLfile label) (equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) label))
+(define (donelog-befoisnoagr-check? DLfile type)
+	(define lst (reverse (donelog-load DLfile #t)))
+	(and (list? lst) (car lst) (string=? (caar lst) type)))
 ;records
 (define (donelog-record rec) (and (eq? (car rec) 'rec) (cdr rec)))
 (define (donelog-record-length record)
@@ -68,12 +79,9 @@
 	(define rec (or (donelog-record record) record))
 	(- (donelog-record-length record) (cadar rec)))
 ;proc
-(define (donelog-proc-check? DLfile)
-	(equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) 'proc))
+(define (donelog-proc-check? DLfile) (donelog-befois-check? DLfile 'proc))
 ;part
-(define (donelog-part-check? DLfile)
-	(define lst (reverse (donelog-load DLfile #t)))
-	(and (list? lst) (car lst) (string=? (caar lst) "p")))
+(define (donelog-part-check? DLfile) (donelog-befoisnoagr DLfile "p"))
 
 (define (test)
 ;	log file, record consist from:
