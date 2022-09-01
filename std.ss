@@ -9,9 +9,13 @@
 	(if (null? ost) (reverse out)
 		(rec (cdr ost) (if (member (car ost) (string->list sep)) '() (cons (car ost) word)) 
 			(if (member (car ost) (string->list sep)) (cons (list->string (reverse word)) out) out)))))
-(define (string-join sep . lst) 
-	(do ((ost (cdr lst) (cdr ost)) (out (car lst) (string-append out sep (car ost)))) ((null? ost) out)))
+(define (string-join sep . lst) (if (null? lst) "" 
+	(do ((ost (cdr lst) (cdr ost)) (out (car lst) (string-append out sep (car ost)))) ((null? ost) out))))
 ;(fold (lambda(k v) (string-append v sep k)) (car lst) lst))
+(define (string-chomp str) 
+	(if (= 0 (string-length str)) "" 
+		(let ((rnd (rex-match? "^\\s*(.+)\\s*$" str)))
+			(if rnd (rex-sub rnd 1) ""))))
 
 ;lists
 (define (filter pred lst)

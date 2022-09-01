@@ -7,7 +7,7 @@
 		((set! trms (rex-match? "^([\t<])(\\d+)\t(\\d+)\t(.+)$" line)) 
 			(map (lambda (f v) (f v)) (list values string->number string->number values) 
 				(cdr (rex-list-nums trms))))
-		((set! trms (rex-match? "^(>)(\\d+)\t(.+)$" line)) 
+		((set! trms (rex-match? "^(>)(\\d+)\t(.*)$" line)) 
 			(map (lambda (f v) (f v)) (list values string->number values) (cdr (rex-list-nums trms))))
 		((and partline (set! trms (rex-match? "^\t(\\d+)$" line))) 
 			(list "p" (string->number (rex-sub trms 1))))
@@ -67,6 +67,9 @@
 (define (donelog-record-planed-diff record) 
 	(define rec (or (donelog-record record) record))
 	(- (donelog-record-length record) (cadar rec)))
+;proc
+(define (donelog-proc-check? DLfile)
+	(equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) 'proc))
 ;part
 (define (donelog-part-check? DLfile)
 	(define lst (reverse (donelog-load DLfile #t)))
