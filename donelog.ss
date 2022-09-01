@@ -63,14 +63,35 @@
 	(define lst (reverse (donelog-load DLfile #t)))
 	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))
 
-;any with recordes complited uncomplited free, but parsed
-(define (donelog-befois-check? DLfile label) (equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) label))
+;;types - parsed file lines (first element is marker)
 (define (donelog-befoisnoagr-check? DLfile type)
 	(define lst (reverse (donelog-load DLfile #t)))
 	(and (list? lst) (car lst) (string=? (caar lst) type)))
-;records
-(define (donelog-record rec) (and (eq? (car rec) 'rec) (cdr rec)))
-(define (donelog-record-length record)
+;begin - begin of deal (consist from: start, planed length, description)
+(define (donelog-type-begin-start beg) (cadr beg))
+(define (donelog-type-begin-planed beg) (caddr beg))
+(define (donelog-type-begin-descr beg) (cadddr beg))
+;end - end of deal (cf: stop, comment)
+(define (donelog-type-end-stop end) (cadr end))
+(define (donelog-type-end-comment end) (caddr end))
+;wait - pause in deal (cf: start, stop, mesg)
+(define (donelog-type-wait-start wait) (cadr wait))
+(define (donelog-type-wait-end wait) (cadr wait))
+(define (donelog-type-wait-length wait) (- (caddr wait) (cadr wait)))
+(define (donelog-type-wait-descr wait) (cadddr wait))
+;part - uncomplited wait (cf: start)
+(define (donelog-type-part-start wait) (cadr wait))
+(define (donelog-part-check? DLfile) (donelog-befoisnoagr-check? DLfile "p"))
+;;dones - agregated and parsed lines
+(define (donelog-befois-check? DLfile label) (equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) label))
+;records - complited deal (cf: begin, (list of waits), end)
+(define (donelog-record? done) (and (eq? (car done) 'rec) done))
+(define (donelog-record-begin done) (cadr done))
+(define (donelog-record-waits done) (caddr done))
+(define (donelog-record-end done) (cadddr done))
+(define (donelog-record-begin-start done) (cadr done))
+(define (donelog-record-comment done) ( done))
+(define (donelog-record-length done)
 	(define rec (or (donelog-record record) record))
 	(define rec_begin (caar rec))
 	(define rec_end (caaddr rec))
@@ -78,10 +99,10 @@
 (define (donelog-record-planed-diff record) 
 	(define rec (or (donelog-record record) record))
 	(- (donelog-record-length record) (cadar rec)))
-;proc
+;proc - deal in process, record without end
 (define (donelog-proc-check? DLfile) (donelog-befois-check? DLfile 'proc))
-;part
-(define (donelog-part-check? DLfile) (donelog-befoisnoagr DLfile "p"))
+;free - wait un deal 
+(define (donelog-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 
 (define (test)
 ;	log file, record consist from:
