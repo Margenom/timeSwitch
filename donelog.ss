@@ -1,7 +1,7 @@
 (load "std.ss")
 
 ; parser
-(define*(donelog-parse-line line (partline #t))
+(define*(dlg-parse-line line (partline #t))
 	(define trms #f)
 	(cond 
 		((set! trms (rex-match? "^([\t<])(\\d+)\t(\\d+)\t(.+)$" line)) 
@@ -14,7 +14,7 @@
 		(else #f)))
 
 ; agregate parsed lines into records or part (uncomplited) or free (unplaned and unhead)
-(define*(donelog-agregate parsed (allow_free #f) (allow_processed #f))
+(define*(dlg-agregate parsed (allow_free #f) (allow_processed #f))
 	(let rec((ost parsed) (out '()) (waits '()) (head #f))
 		(if (null? ost) (reverse (if (and allow_processed head) 
 				(cons (list 'proc head (reverse waits)) out) out)) ; like processing
@@ -33,76 +33,76 @@
 			(rec (cdr ost) out waits head)))))
 
 ; any from end
-(define (donelog-uncomplite parsed) (let rec((ost (reverse parsed)) (out '()))
+(define (dlg-uncomplite parsed) (let rec((ost (reverse parsed)) (out '()))
 	(if (or (null? ost) (and (car ost) (string=? (caar ost) ">"))) out (rec (cdr ost) (cons (car ost) out)))))
 
 ;io 
-(define (donelog-pretty-print agrd)
+(define (dlg-pretty-print agrd)
 	(if (null? agrd) agrd (let ((agr (car agrd))) (case (car agr)
 			((rec) (print agr))
 			((part) (print agr))
 			((free) (print agr))
 			((proc) (map print agr))
 			(else (print agr)))
-		(donelog-pretty-print (cdr agrd)))))
+		(dlg-pretty-print (cdr agrd)))))
 ;load 
-(define*(donelog-load DLfile (allow_partline #t)) 
-	(map (lambda(l) (donelog-parse-line l allow_partline)) (read-lines DLfile)))
+(define*(dlg-load DLfile (allow_partline #t)) 
+	(map (lambda(l) (dlg-parse-line l allow_partline)) (read-lines DLfile)))
 ;write 
-(define*(donelog-append-begin DLfile busy (now (clock-seconds))) 
+(define*(dlg-append-begin DLfile busy (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() 
 		(print "<" now "\t" (* 60 (list-ref busy 5)) "\t" (list-ref busy 6)))))
-(define*(donelog-append-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
+(define*(dlg-append-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
 	(map display (list "\t" now)))))
-(define*(donelog-append-tail DLfile mesg (now (clock-seconds))) 
+(define*(dlg-append-tail DLfile mesg (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
-(define*(donelog-append-end DLfile comment (now (clock-seconds))) 
+(define*(dlg-append-end DLfile comment (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print ">" now "\t" comment))))
 ;spec
-(define*(donelog-last-done DLfile (type #f) (full #f))
-	(define lst (reverse (donelog-load DLfile #t)))
+(define*(dlg-last-done DLfile (type #f) (full #f))
+	(define lst (reverse (dlg-load DLfile #t)))
 	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))
 
 ;;types - parsed file lines (first element is marker)
-(define (donelog-befoisnoagr-check? DLfile type)
-	(define lst (reverse (donelog-load DLfile #t)))
-	(and (list? lst) (car lst) (string=? (caar lst) type)))
+(define (dlg-befoisnoagr-check? DLfile type)
+	(define lst (reverse (dlg-load DLfile #t)))
+	(and (list? lst) (car lst) (string=? (caar lst) type)):)
 ;begin - begin of deal (consist from: start, planed length, description)
-(define (donelog-type-begin-start beg) (cadr beg))
-(define (donelog-type-begin-planed beg) (caddr beg))
-(define (donelog-type-begin-descr beg) (cadddr beg))
+(define (dlg-type-begin-start beg) (cadr beg))
+(define (dlg-type-begin-planed beg) (caddr beg))
+(define (dlg-type-begin-descr beg) (cadddr beg))
 ;end - end of deal (cf: stop, comment)
-(define (donelog-type-end-stop end) (cadr end))
-(define (donelog-type-end-comment end) (caddr end))
+(define (dlg-type-end-stop end) (cadr end))
+(define (dlg-type-end-comment end) (caddr end))
 ;wait - pause in deal (cf: start, stop, mesg)
-(define (donelog-type-wait-start wait) (cadr wait))
-(define (donelog-type-wait-end wait) (cadr wait))
-(define (donelog-type-wait-length wait) (- (caddr wait) (cadr wait)))
-(define (donelog-type-wait-descr wait) (cadddr wait))
+(define (dlg-type-wait-start wait) (cadr wait))
+(define (dlg-type-wait-end wait) (cadr wait))
+(define (dlg-type-wait-length wait) (- (caddr wait) (cadr wait)))
+(define (dlg-type-wait-descr wait) (cadddr wait))
 ;part - uncomplited wait (cf: start)
-(define (donelog-type-part-start wait) (cadr wait))
-(define (donelog-part-check? DLfile) (donelog-befoisnoagr-check? DLfile "p"))
+(define (dlg-type-part-start wait) (cadr wait))
+(define (dlg-part-check? DLfile) (dlg-befoisnoagr-check? DLfile "p"))
 ;;dones - agregated and parsed lines
-(define (donelog-befois-check? DLfile label) (equal? (caar (reverse (donelog-agregate (donelog-load DLfile #t) #t #t))) label))
+(define (dlg-befois-check? DLfile label) (equal? (caar (reverse (dlg-agregate (dlg-load DLfile #t) #t #t))) label))
 ;records - complited deal (cf: begin, (list of waits), end)
-(define (donelog-record? done) (and (eq? (car done) 'rec) done))
-(define (donelog-record-begin done) (cadr done))
-(define (donelog-record-waits done) (caddr done))
-(define (donelog-record-end done) (cadddr done))
-(define (donelog-record-begin-start done) (cadr done))
-(define (donelog-record-comment done) ( done))
-(define (donelog-record-length done)
-	(define rec (or (donelog-record record) record))
+(define (dlg-record? done) (and (eq? (car done) 'rec) done))
+(define (dlg-record-begin done) (cadr done))
+(define (dlg-record-waits done) (caddr done))
+(define (dlg-record-end done) (cadddr done))
+(define (dlg-record-begin-start done) (cadr done))
+(define (dlg-record-comment done) ( done))
+(define (dlg-record-length done)
+	(define rec (or (dlg-record record) record))
 	(define rec_begin (caar rec))
 	(define rec_end (caaddr rec))
 	(define rec_waits_length (apply + (map cadr (cadr rec)))))
-(define (donelog-record-planed-diff record) 
-	(define rec (or (donelog-record record) record))
-	(- (donelog-record-length record) (cadar rec)))
+(define (dlg-record-planed-diff record) 
+	(define rec (or (dlg-record record) record))
+	(- (dlg-record-length record) (cadar rec)))
 ;proc - deal in process, record without end
-(define (donelog-proc-check? DLfile) (donelog-befois-check? DLfile 'proc))
+(define (dlg-proc-check? DLfile) (dlg-befois-check? DLfile 'proc))
 ;free - wait un deal 
-(define (donelog-free->wait done) (and (eq? (car done) 'free) (cdr done)))
+(define (dlg-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 
 (define (test)
 ;	log file, record consist from:
@@ -117,7 +117,7 @@
 ;	- end_utime
 ;	<- length = end_utime - begin_utime - (sum waits.end_utime - waits.begin_utime)
 ;	- comment
-(define tdl (map donelog-parse-line '(
+(define tdl (map dlg-parse-line '(
 ; begin :pass but ignore 
 	"<3945348953	3434	какаето запись еаввлпво"
 ; use it
@@ -142,8 +142,8 @@
 	"	3453634543<3945348953	4434	какаето запись еаввлпво	5748379863	какаето запись еаввлпво"
 )))
 (map print tdl)
-(define argtdl(donelog-agregate tdl))
+(define argtdl(dlg-agregate tdl))
 (map print argtdl )
-(print (donelog-record-planed-diff (car argtdl)))
-(print (donelog-uncomplite (reverse tdl)))
+(print (dlg-record-planed-diff (car argtdl)))
+(print (dlg-uncomplite (reverse tdl)))
 )

@@ -22,28 +22,28 @@
 
 ;main
 (define (args-check need) (unless (need-args? 2 (or need 0) (if need 0 #f)) (begin (print-help) (exit))))
-(define (part-check) (if (donelog-part-check? DoneLogFile) (begin (print "boxy stuned") (exit))))
-(define*(proc-check (type values) (mesg "boxy in procesed")) (if (type (donelog-proc-check? DoneLogFile)) (begin (print mesg) (exit))))
+(define (part-check) (if (dlg-part-check? DoneLogFile) (begin (print "boxy stuned") (exit))))
+(define*(proc-check (type values) (mesg "boxy in procesed")) (if (type (dlg-proc-check? DoneLogFile)) (begin (print mesg) (exit))))
 (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
 ;planed
 	((select) (args-check 1) (part-check) (proc-check)
-		(donelog-append-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
+		(dlg-app-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
 	)((list)  (args-check 0) (do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
 			(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6)))
 	)((timer) (part-check) (proc-check) (args-check #f) ;system command
 		(print (apply string-join " " (cddr CLI_ARGS)))
 	)((end) (proc-check not "boxy no started") (part-check) (args-check #f) ;comment
-		(donelog-append-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
-	)((now) (args-check 0) (print (donelog-uncompited (donelog-load DoneLogFile #t)))
+		(dlg-app-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
+	)((now) (args-check 0) (print (dlg-uncompited (dlg-load DoneLogFile #t)))
 	)((check) (args-check 0) 
 ;unplaned
-	)((stun) (part-check) (args-check 0) (donelog-append-head DoneLogFile)
-	)((tell) (args-check #f) (donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
+	)((stun) (part-check) (args-check 0) (dlg-app-head DoneLogFile)
+	)((tell) (args-check #f) (dlg-app-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)))
 	)((next) (args-check #f) 
-		(let ((last (donelog-last-done DoneLogFile "\t")))
+		(let ((last (dlg-last-done DoneLogFile "\t")))
 			(unless last (begin (print "last is no done") (exit))) (let ( (beg (caddr last)) (end (clock-seconds)))
-			(donelog-append-head DoneLogFile beg)
-			(donelog-append-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)) end)
+			(dlg-app-head DoneLogFile beg)
+			(dlg-app-tail DoneLogFile (apply string-join " " (cddr CLI_ARGS)) end)
 			(if (param-or-val "noshow" #t (lambda(v) #f)) (print "Length: " (/(- end beg) 60.) "'"))))
 	)((wait) (part-check) (args-check #f) ;mesg
 		(display "Stop C-c, in args or mesg: ")
@@ -52,10 +52,10 @@
 				(stop (clock-seconds))
 				(clistring (if (null? (cddr CLI_ARGS)) inpstring (apply string-join " " (cddr CLI_ARGS)))))
 		(if (string=? "" clistring) (begin (print "no mesg") (exit)) (begin
-			(donelog-append-head DoneLogFile start)
-			(donelog-append-tail DoneLogFile (if (string=? "" inpstring) inpstring clistring) stop))))
+			(dlg-app-head DoneLogFile start)
+			(dlg-app-tail DoneLogFile (if (string=? "" inpstring) inpstring clistring) stop))))
 ;other
 	)((stat) (args-check 0) ;pattern match
-		;(print (donelog-uncomplite (map donelog-parse-line (donelog-load DoneLogFile))))
-		(donelog-pretty-print (donelog-agregate (donelog-load DoneLogFile #t) #t #t))
+		;(print (dlg-uncomplite (map dlg-parse-line (dlg-load DoneLogFile))))
+		(dlg-pretty-print (dlg-agregate (dlg-load DoneLogFile #t) #t #t))
 	)(else (print-help)))
