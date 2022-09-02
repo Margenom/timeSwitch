@@ -65,15 +65,16 @@
 						(if (and allow_free (not head)) (cons (cons 'free (dlgt-wait->short unt)) out) out) 
 						(if (> 0 (dlgt-wait-length unt)) waits (cons (dlgt-wait->short unt)  waits)) head)
 				; part
-				) ((#\p) (rec (cdr ost) (if (and allow_free (not head)) (cons (cons 'part (cdar ost)) out) out) (cons (cdar ost) waits) head)
+				) ((#\p) (rec (cdr ost) 
+					(if (and allow_free (not head)) (cons (list 'part (dlgt-part-start unt)) out) out)
+						(cons (list (dlgt-part-start unt)) waits) head)
 				; begin
-				) ((#\<) (rec (cdr ost) (if (and allow_processed head) 
-					(cons (list 'proc head (reverse waits)) out)
-					out) '() (cdar ost))
+				) ((#\<) (rec (cdr ost) 
+					(if (and allow_processed head) (cons (list 'proc head (reverse waits)) out) out) '() unt)
 				; end
-				) ((#\>) (rec (cdr ost) (cons (list 'rec head (reverse waits) (cdar ost)) out) '() #f)
-				) (else (rec (cdr ost) out waits head))) 
-			(rec (cdr ost) out waits head))))))
+				) ((#\>) (rec (cdr ost) (cons (list 'rec head (reverse waits) unt) out) '() #f)
+				) (else (rec (cdr ost) out waits head))))
+			(rec (cdr ost) out waits head)))))
 ;;dones - agregated and parsed lines
 (define (dlg-befois-check? DLfile label) (equal? (caar (reverse (dlg-agregate (dlg-load DLfile #t) #t #t))) label))
 ;records - complited deal (cf: begin, (list of waits), end)
