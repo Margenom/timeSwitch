@@ -1,5 +1,8 @@
 (load "std.ss")
 
+;hum utils
+(define (secs->mins secs) (round (/ secs 60.)))
+
 ; parser
 (define*(dlg-parse-line line (partline #t))
 	(define trms #f)
@@ -18,13 +21,16 @@
 
 ;;types - parsed file lines (first element is marker)
 (define (dlg-type-remove typed) (cdr typed))
+(define (dlg-type typed type) (and (string=? type (car typed)) (dlg-type-remove typed)))
 (define (dlg-befoisnoagr-check? DLfile type)
 	(define lst (reverse (dlg-load DLfile #t)))
-	(and (list? lst) (car lst) (string=? (caar lst) type)):)
+	(and (list? lst) (car lst) (string=? (caar lst) type)))
 ;begin - begin of deal (consist from: start, planed length, description)
 (define (dlgt-begin-start beg) (car beg))
 (define (dlgt-begin-planed beg) (cadr beg))
 (define (dlgt-begin-descr beg) (caddr beg))
+(define (dlgt-begin-hum beg) ; pretty time, minutes
+	(list (clock-pretty (dlgt-begin-start beg)) (/ (dlgt-begin-planed beg) 60.) (dlgt-begin-descr beg)))
 ; write
 (define*(dlg-app-begin DLfile busy (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() 
@@ -32,11 +38,14 @@
 ;end - end of deal (cf: stop, comment)
 (define (dlgt-end-stop end) (car end))
 (define (dlgt-end-comment end) (cadr end))
+(define (dlgt-end-hum end) ; pretty time, minute
+	(list (clock-pretty (dlgt-end-start end)) (dlgt-end-comment end)))
 ; write
 (define*(dlg-app-end DLfile comment (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print ">" now "\t" comment))))
 ;part - uncomplited wait or head (cf: start)
 (define (dlgt-part-start wait) (car wait))
+(define (dlgt-wait-hum part) (list (clock-pretty (dlgt-part-start wait))))
 (define (dlg-part-check? DLfile) (dlg-befoisnoagr-check? DLfile "p"))
 ; write
 (define*(dlg-app-head DLfile (now (clock-seconds))) (with-output-to-file-append DLfile (lambda()
@@ -45,7 +54,9 @@
 (define (dlgt-wait-start wait) (car wait))
 (define (dlgt-wait-end wait) (cadr wait))
 (define (dlgt-wait-length wait) (- (cadr wait) (car wait)))
-(define (dlgt-wait-descr wait) (caddr wait))
+(define (dlgt-wait-mesg wait) (caddr wait))
+(define (dlgt-wait-hum wait) ; pretty time, minutes
+	(list (clock-pretty (dlgt-wait-start wait)) (secs->mins (dlgt-wait-length wait)) (dlgt-wait-mesg wait)))
 ; write
 (define*(dlg-app-tail DLfile mesg (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
@@ -59,7 +70,7 @@
 					(mark (string-ref (caar ost) 0))
 					(unt (dlg-type-remove (car ost))))
 				(case mark
-				; waits
+				; wait
 					((#\tab) (rec (cdr ost) 
 						(if (and allow_free (not head)) (cons (cons 'free unt) out) out) 
 						(if (> 0 (dlgt-wait-length unt)) waits (cons unt  waits)) head)
@@ -79,51 +90,60 @@
 ;records - complited deal (cf: begin, (list of waits), end)
 (define (dlgd-rec? done) (and (eq? (car done) 'rec) done))
 (define (dlgd-rec-begin done) (cadr done))
-(define (dlgdr-begin-start beg) (car beg))
-(define (dlgdr-begin-planed beg) (cadr beg))
-(define (dlgdr-begin-descr beg) (caddr beg))
 (define (dlgd-rec-waits done) (caddr done))
-; rec's wait like wait, but no have marker and end (use length)
-(define (dlgdr-wait-start wait) (car wait))
-(define (dlgdr-wait-length wait) (cadr wait))
-(define (dlgdr-wait-descr wait) (caddr wait))
-(define (dlgdr-wait-hum wait)
-	(list (clock-pretty (dlgdr-wait-start wait)) (/ (dlgdr-wait-length wait) 60.) (dlgdr-wait-descr wait)))
 (define (dlgd-rec-end done) (cadddr done))
-(define (dlgdr-end-stop end) (car end))
-(define (dlgdr-end-comment end) (cadr end))
 (define (dlgd-rec-length done) 
-	(- (dlgdr-end-stop (dlgd-rec-end done)) (dlgdr-beg-start (dlgd-rec-begin done)) 
-		(apply + (map dlgdr-wait-length (dlgd-rec-waits done)))))
+	(- (dlgt-end-stop (dlgd-rec-end done)) (dlgt-begin-start (dlgd-rec-begin done)) 
+		(apply + (map dlgt-wait-length (dlgd-rec-waits done)))))
 (define (dlgd-rec-planed-diff done) 
-	(- (dlgd-rec-length done) (dlgdr-begin-planed (dlgd-rec-begin done))))
+	(- (dlgd-rec-length done) (dlgt-begin-planed (dlgd-rec-begin done))))
+(define (dlgd-rec-hum done)
+	(define beg (dlgd-rec-begin done))
+	(define end (dlgd-rec-end done))
+	(define waits (dlgd-rec-waits done))
+	(print (clock-pretty (dlgt-begin-start beg)) "\t" (secs->mins (dlgd-rec-planed-diff done)) "'\t" (dlgt-begin-descr beg))
+	(print 	(secs->mins (- (dlgt-end-stop end) 
+	(let rec((w waits) (ltime (dlgt-begin-start beg)))
+		(if (null? w) ltime (begin 
+			(print "\t" (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\t" (secs->mins (dlgt-wait-length (car w))) "'\t" (dlgt-wait-mesg (car w)))
+			(rec (cdr w) (dlgt-wait-end (car w))))))
+		)) "'\t" (secs->mins (dlgd-rec-length done)) "'\t" (dlgt-end-comment end)))
+
 ;proc - deal in process, record without end
 (define (dlgd-proc-check? DLfile) (dlg-befois-check? DLfile 'proc))
 (define (dlgd-proc-begin done) (cadr done))
 (define (dlgd-proc-waits done) (caddr done)) ;may be exists part
 (define (dlgd-wait-check? wait) (= 3 (length wait)))
 (define (dlgd-part-check? wait) (= 1 (length wait)))
-;(define*(dlgd-proc-length done (now (clock-seconds))) 
-;	(- now (dlgdr-beg-start (dlgd-proc-begin done)) 
-;		(apply + (map (lambda(w) (if (dlgd-wait-check? w) (dlgdr-wait-length  (dlgd-proc-waits done)))))
-(define (dlgd-rec-planed-diff done) 
-	(- (dlgd-rec-length done) (dlgdr-begin-planed (dlgd-rec-begin done))))
+(define*(dlgd-proc-length done (now (clock-seconds))) (- now (dlgt-begin-start (dlgd-proc-begin done)) 
+	(apply + (map (lambda(w) (if (dlgd-wait-check? w) (dlgt-wait-length w) 0)) (dlgd-proc-waits done)))))
+(define*(dlgd-proc-planed-diff done (now (clock-seconds))) 
+	(- (dlgd-proc-length done now) (dlgt-begin-planed (dlgd-proc-begin done))))
+(define*(dlgd-proc-hum done (now (clock-seconds)))
+	(define beg (dlgd-proc-begin done))
+	(define waits (dlgd-proc-waits done))
+	(print (clock-pretty (dlgt-begin-start beg)) "\t" (secs->mins (dlgd-proc-planed-diff done now)) "'\t" (dlgt-begin-descr beg))
+	(print 	(secs->mins (- now 
+	(let rec((w waits) (ltime (dlgt-begin-start beg)))
+		(if (null? w) ltime (begin 
+			(map display (list "\t" (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\t"))
+			(if (dlgd-part-check? (car w)) (begin (newline) (rec (cdr w) ltime)) (begin
+				(print (secs->mins (dlgt-wait-length (car w))) "'\t" (dlgt-wait-mesg (car w)))
+				(rec (cdr w) (dlgt-wait-end (car w))))))))
+		)) "'\t" (secs->mins (dlgd-proc-length done now)) "'"))
+
 ;free - wait un deal 
 (define (dlgd-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 
 ;spec
-(define*(dlg-last-done DLfile (type #f) (full #f))
-	(define lst (reverse (dlg-load DLfile #t)))
+(define*(dlg-last-done DLfile (type #f) (full #f)) (define lst (reverse (dlg-load DLfile #t)))
 	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))
 (define (dlg-pretty-print agrd)
 	(if (null? agrd) agrd (let ((agr (car agrd))) (case (car agr)
-;			((free)	(print (apply string-join "\t" (dlgt-wait-hum ((dlgd-free->wait agr))))))
-;			((rec) (let*((waits (dlgd-rec-waits agr))(beg (dlgd-rec-begin agr))(end (dlgd-rec-end agr))
-;					(time (clock-pretty (dlgt-wait-start wait)))
-;					(len (/ (dlgt-wait-length wait) 60.))
-;					(descr (dlgt-wait-descr wait)))
-;				(print time "\t" len "\t" descr))
-			((proc) (print agr))
+			((free) (map (lambda (v e) (display v)(display e)) 
+				(dlgt-wait-hum (dlgd-free->wait agr)) '("\t" "'\t" "\n")))
+			((rec) (dlgd-rec-hum agr))
+			((proc) (dlgd-proc-hum agr))
 			(else (print agr)))
 		(dlg-pretty-print (cdr agrd)))))
 ; any from end
