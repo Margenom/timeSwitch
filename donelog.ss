@@ -46,7 +46,6 @@
 (define (dlgt-wait-end wait) (cadr wait))
 (define (dlgt-wait-length wait) (- (cadr wait) (car wait)))
 (define (dlgt-wait-descr wait) (caddr wait))
-(define (dlgt-wait->short wait) (list (dlgt-wait-start wait) (dlgt-wait-length wait) (dlgt-wait-descr wait)))
 ; write
 (define*(dlg-app-tail DLfile mesg (now (clock-seconds))) 
 	(with-output-to-file-append DLfile (lambda() (print "\t" now "\t" mesg))))
@@ -62,8 +61,8 @@
 				(case mark
 				; waits
 					((#\tab) (rec (cdr ost) 
-						(if (and allow_free (not head)) (cons (cons 'free (dlgt-wait->short unt)) out) out) 
-						(if (> 0 (dlgt-wait-length unt)) waits (cons (dlgt-wait->short unt)  waits)) head)
+						(if (and allow_free (not head)) (cons (cons 'free unt) out) out) 
+						(if (> 0 (dlgt-wait-length unt)) waits (cons unt  waits)) head)
 				; part
 				) ((#\p) (rec (cdr ost) 
 					(if (and allow_free (not head)) (cons (list 'part (dlgt-part-start unt)) out) out)
