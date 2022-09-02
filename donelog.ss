@@ -97,7 +97,7 @@
 		(apply + (map dlgt-wait-length (dlgd-rec-waits done)))))
 (define (dlgd-rec-planed-diff done) 
 	(- (dlgd-rec-length done) (dlgt-begin-planed (dlgd-rec-begin done))))
-(define (dlgd-rec-hum done)
+(define*(dlgd-rec-hum done)
 	(define beg (dlgd-rec-begin done))
 	(define end (dlgd-rec-end done))
 	(define waits (dlgd-rec-waits done))
@@ -133,6 +133,19 @@
 		)) "'\t" (secs->mins (dlgd-proc-length done now)) "'"))
 ;free - wait un deal 
 (define (dlgd-free->wait done) (and (eq? (car done) 'free) (cdr done)))
+;unification or generaly
+(define (dlgd-make-gen-ret lrec lproc lfree) (lambda(done) (case (car done)
+	((rec) (lrec done)) ((proc) (lproc done)) ((free) (lfree done)) (else #f))))
+(define dlgd-gen-start (dlgd-make-gen-ret
+	(lambda(done) (dlgt-begin-start (dlgd-rec-begin done)))
+	(lambda(done) (dlgt-begin-start (dlgd-proc-begin done)))
+	(lambda(done) (dlgt-wait-start (dlgd-free->wait done)))))
+(define dlgd-gen-length (dlgd-make-gen-ret
+	dlgd-rec-length  dlgd-proc-length (lambda(done) (dlgt-wait-length (dlgd-free->wait done)))))
+(define dlgd-gen-stop (dlgd-make-gen-ret
+	(lambda(done) (dlgt-end-stop (dlgd-rec-end done)))
+	(lambda(done) (clock-seconds))
+	(lambda(done) (dlgt-wait-stop (dlgd-free->wait done)))))
 
 ;spec
 (define*(dlg-last-done DLfile (type #f) (full #f)) (define lst (reverse (dlg-load DLfile #t)))
@@ -145,6 +158,19 @@
 			((proc) (dlgd-proc-hum agr))
 			(else (print agr)))
 		(dlg-pretty-print (cdr agrd)))))
+(define*(dlg-grep paterns agrd (allow_waits #f)) (map (lambda(c) (map (lambda(h t) (if h (cons h t) t)) c paterns))
+	(let ((ost agrd))  (if (null? ost) '() ((lambda(m) (let ((tail (rec (cdr ost)))) (if m (cons m tail) tail))) 
+		(and (car ost) (let ((head (car ost))) (case (car head)
+			((free) (map (lambda(p) (and (rex-match? p (dlgt-wait-mesg (dlgd-free->wait head))) head)) paterns))
+			((proc) (map (lambda(p) (and (rex-match? p (dlgt-begin-descr (dlgd-proc-begin head))) head)) paterns))
+			((rec) (map (lambda(p) (and (or (rex-match? p (dlgt-begin-descr (dlgd-rec-begin head)))
+				(rex-match? p (dlgt-end-comment (dlgd-rec-end head)))) head)) paterns))
+			(else #f)))))))))
+(define*(dlg-patical-length grops)
+	(define gen-length-in-groups (map (lambda(group) (apply + (map dlg-ren-length group))) groups))
+	(define total-group-length (apply + gen-length-in-groups))
+	(map (lambda(gl) (/ gl total-group-length)) gen-length-in-groups))
+(define*(dlg-time-filter agrd secondsago (now (clock-second))) (filter (lambda(a) (> (dlgd-gen-start a) (- now secondsago))) agrd))
 ; any from end
 (define (dlg-uncomplite parsed) (let rec((ost (reverse parsed)) (out '()))
 	(if (or (null? ost) (and (car ost) (string=? (caar ost) ">"))) out (rec (cdr ost) (cons (car ost) out)))))

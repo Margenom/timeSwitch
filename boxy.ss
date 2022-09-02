@@ -60,4 +60,8 @@
 	)((stat) (args-check 0) ;pattern match
 		;(print (dlg-uncomplite (map dlg-parse-line (dlg-load DoneLogFile))))
 		(dlg-pretty-print (dlg-agregate (dlg-load DoneLogFile #t) #t #t))
+		;what sould be here
+	)((parts) (args-check #f) ;pattern match
+		;(print (dlg-uncomplite (map dlg-parse-line (dlg-load DoneLogFile))))
+		(dlg-pretty-print (dlg-agregate (dlg-load DoneLogFile #t) #t #t))
 	)(else (print-help)))
