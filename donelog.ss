@@ -131,7 +131,6 @@
 				(print (secs->mins (dlgt-wait-length (car w))) "'\t" (dlgt-wait-mesg (car w)))
 				(rec (cdr w) (dlgt-wait-end (car w))))))))
 		)) "'\t" (secs->mins (dlgd-proc-length done now)) "'"))
-
 ;free - wait un deal 
 (define (dlgd-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 

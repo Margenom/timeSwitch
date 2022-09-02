@@ -7,6 +7,7 @@
 /* subs */
 #include "rex.c"
 #include "io.c"
+#include "gui.c"
 #include "time_clock.c"
 
 #define BOXY_SCRIPT "/boxy.ss"
@@ -31,6 +32,7 @@ int main(int argc, char *argv[]) {
 // init subs
 	rex(sc);
 	io(sc);
+	gui(sc);
 	time_clock(sc);
 
 { // init globals variables
@@ -42,7 +44,7 @@ int main(int argc, char *argv[]) {
 			char *sep = strchr(arg, '=');
 			params = s7_cons(sc, s7_cons(sc, 
 					s7_make_string_with_length(sc, arg+1, (sep? sep - arg: strlen(arg))-1),
-					sep? s7_make_string(sc, sep+1): s7_f(sc)),
+					sep? s7_make_string(sc, sep+1): s7_t(sc)),
 				params);
 		} else {data = s7_cons(sc, s7_make_string(sc, arg), data);}
 	}
