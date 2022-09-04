@@ -17,6 +17,11 @@
 ;globals
 (define Busy (filter values (map busy-parse-line (read-lines BusyFile))))
 
+(define (Ago-filter) 
+	(define Secago (apply + (map (lambda(mn name) (* mn (param-or-val name 0 string->number)))
+		'(1 60 3600 86400 604800 1814400) '("ts" "tm" "th" "td" "tw" "tc"))))
+	((if (= 0 Secago) values (lambda(agrs) (dlg-time-filter agrs Secago))) 
+		(dlg-agregate (dlg-load DoneLogFile #t) #t #t)))
 (define (print-help) (with-input-from-file (BoxyHome "README.txt") (lambda()
 	(do ((ln (read-line) (read-line))) ((equal? ln #<eof>)) (print ln)))))
 
@@ -28,8 +33,9 @@
 ;planed
 	((select) (args-check 1) (part-check) (proc-check)
 		(dlg-app-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
-	)((list)  (args-check 0) (do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
-			(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6)))
+	)((list)  (args-check #f) (do ((i 0 (+ i 1)) (ost Busy (cdr ost))) ((null? ost))
+			(if (or (null? (cddr CLI_ARGS)) (apply and (map (lambda(r) (list? (rex-match? r (list-ref (car ost) 6)))) (cddr CLI_ARGS))))
+				(print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6))))
 	)((timer) (part-check) (proc-check) (args-check #f) ;system command
 		(print (apply string-join " " (cddr CLI_ARGS)))
 	)((end) (proc-check not "boxy no started") (part-check) (args-check #f) ;comment
@@ -57,11 +63,13 @@
 			(dlg-app-head DoneLogFile start)
 			(dlg-app-tail DoneLogFile (if (string=? "" inpstring) inpstring clistring) stop))))
 ;other
-	)((stat) (args-check 0) ;pattern match
-		;(print (dlg-uncomplite (map dlg-parse-line (dlg-load DoneLogFile))))
-		(dlg-pretty-print (dlg-agregate (dlg-load DoneLogFile #t) #t #t))
+	)((showall) (args-check 0) (dlg-pretty-print (Ago-filter))
+	)((stat) (args-check 0) (dlg-pretty-print (Ago-filter))
+	)((parts) (args-check #f) (let ((paterns (cddr CLI_ARGS)))
+		(if (null? paterns) (begin (print "No paterns") (exit))) (let*(
+				(groups (map cdr (filter list? (dlg-grep paterns (Ago-filter)))))
+				(partical (dlg-patical-length groups)))
+		(map (lambda(p t) (print p "\t" (round (* 100 t)) "%")) paterns partical)
+		(print "Total(all groups) time : " (round (/ (apply + (map (lambda(g) (apply + (map dlgd-gen-length g))) groups)) 3600.)) " ч.")))
 		;what sould be here
-	)((parts) (args-check #f) ;pattern match
-		;(print (dlg-uncomplite (map dlg-parse-line (dlg-load DoneLogFile))))
-		(dlg-pretty-print (dlg-agregate (dlg-load DoneLogFile #t) #t #t))
 	)(else (print-help)))
