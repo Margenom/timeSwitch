@@ -52,6 +52,7 @@
 			(unless mesg (begin (print "aborting") (exit)))
 			(dlg-app-head DoneLogFile beg)
 			(dlg-app-tail DoneLogFile mesg end)
+			(if (param-or-val "g" #t)  (notify "Last legth" (string-append (number->string (round (/ (- end beg) 60.))) "min")))
 			(if (param-or-val "noshow" #t (lambda(v) #f)) (print "Length: " (/(- end beg) 60.) "'"))))
 	)((wait) (part-check) (args-check #f) ;mesg
 		(unless (param-or-val "g" #f) (display "Stop C-c, in args or mesg: "))

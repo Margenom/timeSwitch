@@ -3,7 +3,7 @@
 (define (read-lines filename) (with-input-from-file filename (lambda()
 	(do ((line (read-line) (read-line)) (out '() (cons line out)))
 		((equal? #<eof> line) (reverse out))))))
-(define (notify title mesg) (system (string-append "notify-send " title mesg)))
+(define (notify title mesg) (system (string-append "notify-send '" title "' '" mesg "'")))
 
 ;strings
 (define (string-split str sep) (let rec((ost (string->list str)) (word '()) (out '()))
