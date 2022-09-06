@@ -6,11 +6,14 @@
 		(let rec((i 0) (ost lists)) (if (anynull? ost) '()
 			(cons (apply foo i (map car ost)) (rec (+ i 1) (map cdr ost)))))))
 
+;min hour day month week minutes
+(define busy-limits '((0 . 59) (0 . 23) (1 . 31) (1 . 12) (0 . 7) (0 . 1440))) ;1440 - count minutes in 24 hours
+(define rang-up cdr)
+(define rang-dw car)
+(define (ranged val rang) (min (rang-up rang) (max (rang-dw rang) val)))
+
 (define (busy-load busy-file) 
 (define (busy-parse-line line) 
-	(define Limup	#(-1 59 23 31 12 7 1440 -1)) ;1440 - count minutes in 24 hours
-	(define Limdw	#(-1  0  0  1  1 0    0 -1))
-
 	(define*(asnum nums key ifnil (getter rex-sub)) ((lambda(p) (if (= 0 (string-length p)) 
 		(if ifnil ifnil (print "busy-parse-line asnum null")) (string->number p))) (getter nums key)))
 
@@ -19,15 +22,13 @@
 	(define daln (rex-matchl? line "^" iform iform iform iform iform "(\\d+)\\s(.+)$"))
 	(and daln (let rec((dls (rex-list-nums daln)) (out '()) (tm #f) (itr 0))
 		(if (null? dls) out (let*( 
-			(upper (vector-ref Limup itr)) 
-			(lower (vector-ref Limdw itr))
+			(rang (if (or (= 0 itr) (= 7 itr)) '(-1 . -1) (list-ref busy-limits (- itr 1))))
 			;generate rang correcter for type  of value
-			(ranged (lambda(val) (min (max lower val) upper)))
 			(tester (lambda(val)
-				(unless (= val (ranged val)) 
-					(print "in " line "\n\tunranged value: " val " (" lower "," upper "), " (ranged val)  " used"))
+				(unless (= val (ranged val rang)) 
+					(print "in " line "\n\tunranged value: " val " (" (rang-dw rang) "," (rang-up rang) "), " (ranged val rang)  " used"))
 				;week day 0-6 and 7 = 0
-				(if (= 5 itr) (modulo (ranged val) 7) (ranged val))))
+				(if (= 5 itr) (modulo (ranged val rang) 7) (ranged val rang))))
 			(value (cond
 		;minutes
 			((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (tester (string->number (car dls)))
@@ -46,8 +47,8 @@
 						(map tester inr)))
 		;any number *
 			) ((set! tm (rex-match? "^\\*(?:/(\\d\\d?))?$" (car dls))) 
-				(do ((i lower (+ 1 i)) (out '() (if (= 0 (modulo i (tester (asnum tm 1 i)))) (cons i out) out)))
-					((> i upper) out))
+				(do ((i (rang-dw rang) (+ 1 i)) (out '() (if (= 0 (modulo i (tester (asnum tm 1 i)))) (cons i out) out)))
+					((> i (rang-up rang)) out))
 			) (else #f)))
 		) (rec (cdr dls) (cons value out) tm (+ 1 itr)))))))
 	; add id
@@ -57,8 +58,10 @@
 (define (busy-id busy) (list-ref busy 7))
 (define (busy-name busy) (list-ref busy 6))
 (define (busy-length busy) (list-ref busy 5))
-(define (busy-time busy) busy)
-
+(define (take lst count) (if (or (null? lst) (= 0 count)) '()
+	(cons (car lst) (take (cdr lst) (- count 1)))))
+(define (busy-time busy) (take busy 5))
+;busy or time
 (define (busy-week busy) (list-ref busy 4))
 (define (busy-month busy) (list-ref busy 3))
 (define (busy-day busy) (list-ref busy 2))
@@ -67,8 +70,11 @@
 
 (define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
-; brud forse
-(define (busy-now? busy now) (apply and (map list? (map member (busy-clock now) (busy-time busy)))))
+;parttime like busy-clock but part markered by -1 always true
+;'(-1 -1 -1 -1 -1) - any busy-clock value
+(define (busy-partime? busy parttime) (apply and (map (lambda(t b) 
+	(if (negative? t) #t (list?(member t b)))) parttime (busy-time busy))))
+(define (busy-now? busy now) (busy-parttime? busy (busy-clock now)))
 
 ;	busy file
 (define (test)
