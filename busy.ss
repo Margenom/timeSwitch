@@ -1,5 +1,12 @@
 (load "std.ss")
 
+(define (mapi foo . lists) 
+	(define (anynull? lst) (apply or (map null? lst)))
+	(if (and (null? lists) (anynull? lists)) '() 
+		(let rec((i 0) (ost lists)) (if (anynull? ost) '()
+			(cons (apply foo i (map car ost)) (rec (+ i 1) (map cdr ost)))))))
+
+(define (busy-load busy-file) 
 (define (busy-parse-line line) 
 	(define Limup	#(-1 59 23 31 12 7 1440 -1)) ;1440 - count minutes in 24 hours
 	(define Limdw	#(-1  0  0  1  1 0    0 -1))
@@ -11,7 +18,7 @@
 	;0 sur, 1-5 min hour day mounth weekday, 6 minutes, 7+ messg
 	(define daln (rex-matchl? line "^" iform iform iform iform iform "(\\d+)\\s(.+)$"))
 	(and daln (let rec((dls (rex-list-nums daln)) (out '()) (tm #f) (itr 0))
-		(if (null? dls) (cdr (reverse out)) (let*( 
+		(if (null? dls) out (let*( 
 			(upper (vector-ref Limup itr)) 
 			(lower (vector-ref Limdw itr))
 			;generate rang correcter for type  of value
@@ -43,19 +50,25 @@
 					((> i upper) out))
 			) (else #f)))
 		) (rec (cdr dls) (cons value out) tm (+ 1 itr)))))))
+	; add id
+	(mapi (lambda(i b) (cdr (reverse (cons i b))))
+		(filter values (map busy-parse-line (read-lines busy-file)))))
 
-(define (mapi foo . lists) 
-	(define (anynull? lst) (apply or (map null? lst)))
-	(if (and (null? lists) (anynull? lists)) '() 
-		(let rec((i 0) (ost lists)) (if (anynull? ost) '()
-			(cons (apply foo i (map car ost)) (rec (+ i 1) (map cdr ost)))))))
+(define (busy-id busy) (list-ref busy 7))
+(define (busy-name busy) (list-ref busy 6))
+(define (busy-length busy) (list-ref busy 5))
+(define (busy-time busy) busy)
+
+(define (busy-week busy) (list-ref busy 4))
+(define (busy-month busy) (list-ref busy 3))
+(define (busy-day busy) (list-ref busy 2))
+(define (busy-hour busy) (list-ref busy 1))
+(define (busy-min busy) (list-ref busy 0))
 
 (define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
 ; brud forse
-(define (busy-now-filter busy now)
-	(map (lambda(k) (do ((i 0 (+ 1 i)) (t (busy-clock now) (cdr t)) (cmp #t (and cmp (member (car t) (list-ref k i))))) 
-		((null? t) (and cmp  k)))) busy))
+(define (busy-now? busy now) (apply and (map list? (map member (busy-clock now) (busy-time busy)))))
 
 ;	busy file
 (define (test)
