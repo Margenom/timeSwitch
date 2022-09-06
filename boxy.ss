@@ -8,6 +8,8 @@
 (load "busy.ss")
 (load "donelog.ss")
 
+(define (delay sec) (system (string-append "sleep " (number->string sec))))
+
 ;paths
 (define (BoxyHome path) (string-append CLI_PATH "/" path))
 (define (BusyHome path) (string-append (getenv "HOME") "/me/" path))
@@ -29,7 +31,7 @@
 (define (args-check need) (unless (need-args? 2 (or need 0) (if need 0 #f)) (begin (print-help) (exit))))
 (define (part-check) (if (dlg-part-check? DoneLogFile) (begin (print "boxy stuned") (exit))))
 (define*(proc-check (type values) (mesg "boxy in procesed")) (if (type (dlg-proc-check? DoneLogFile)) (begin (print mesg) (exit))))
-(case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
+(define (main) (case (string->symbol (if (need-args? 1 1 #f) (cadr CLI_ARGS) "help"))
 ;planed
 	((select) (args-check 1) (part-check) (proc-check)
 		(dlg-app-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2)))) 
@@ -40,8 +42,13 @@
 		(print (apply string-join " " (cddr CLI_ARGS)))
 	)((end) (proc-check not "boxy no started") (part-check) (args-check #f) ;comment
 		(dlg-app-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
-	)((now) (args-check 0) (print (dlg-uncompited (dlg-load DoneLogFile #t)))
-	)((check) (args-check 0) 
+	)((now) (args-check 0)
+		(do ((i 0 (+ 1 i)) (ost (busy-now-filter Busy (clock-seconds)) (cdr ost))) ((null? ost))
+				(if (car ost) (print i ":\t" (list-ref (car ost) 5) "\t" (list-ref (car ost) 6))))
+	)((check) (args-check 0)
+	)((cron) (args-check 0) (let rec()
+		(map (lambda(k) (and k (notify "Task" (list-ref k 6)))) (busy-now-filter Busy (clock-seconds)))
+		(delay 60) (rec))
 ;unplaned
 	)((stun) (part-check) (args-check 0) (dlg-app-head DoneLogFile)
 	)((tell) (args-check #f) (dlg-app-tail DoneLogFile (if (param-or-val "g" #f) (gui-input-mesg "Tell me what you do") (apply string-join " " (cddr CLI_ARGS))))
@@ -73,4 +80,5 @@
 		(map (lambda(p t) (print p "\t" (round (* 100 t)) "%")) paterns partical)
 		(print "Total(all groups) time : " (round (/ (apply + (map (lambda(g) (apply + (map dlgd-gen-length g))) groups)) 3600.)) " ч.")))
 		;what sould be here
-	)(else (print-help)))
+	)(else (print-help))))
+(main)

@@ -43,8 +43,8 @@ int main(int argc, char *argv[]) {
 		if (*arg == '-') {
 			char *sep = strchr(arg, '=');
 			params = s7_cons(sc, s7_cons(sc, 
-					s7_make_string_with_length(sc, arg+1, (sep? sep - arg: strlen(arg))-1),
-					sep? s7_make_string(sc, sep+1): s7_t(sc)),
+				s7_make_string_with_length(sc, arg+1, (sep? sep - arg: strlen(arg))-1),
+				sep? s7_make_string(sc, sep+1): s7_t(sc)),
 				params);
 		} else {data = s7_cons(sc, s7_make_string(sc, arg), data);}
 	}
