@@ -11,13 +11,14 @@
 (define rang-up cdr)
 (define rang-dw car)
 (define (ranged val rang) (min (rang-up rang) (max (rang-dw rang) val)))
+(define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
-(define (busy-load busy-file)
+(define*(busy-load busy-file (clocktime (busy-clock (clock-seconds))))
 (define (busy-parse-line line)
 	(define*(asnum nums key ifnil (getter rex-sub)) ((lambda(p) (if (= 0 (string-length p))
 		(if ifnil ifnil (print "busy-parse-line asnum null")) (string->number p))) (getter nums key)))
 
-	(define iform "((?:(?:\\d\\d?,)*(?:\\d\\d?)|\\*|\\d\\d?-\\d\\d?)(?:/\\d\\d?)?)\\s+")
+	(define iform "((?:(?:\\d\\d?,)*(?:\\d\\d?)|[?]|\\*|\\d\\d?-\\d\\d?)(?:/\\d\\d?)?)\\s+")
 	;0 sur, 1-5 min hour day mounth weekday, 6 minutes, 7+ messg
 	(define daln (rex-matchl? line "^" iform iform iform iform iform "(\\d+)\\s(.+)$"))
 	(and daln (let rec((dls (rex-list-nums daln)) (out '()) (tm #f) (itr 0))
@@ -30,10 +31,12 @@
 				;week day 0-6 and 7 = 0
 				(if (= 5 itr) (modulo (ranged val rang) 7) (ranged val rang))))
 			(value (cond
-		;minutes
-			((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (tester (string->number (car dls)))
 		;message
-			) ((= itr 7) (car dls)
+			((= itr 7) (car dls)
+		;minutes
+			)((and (= itr 6) (set! tm (rex-match? "^\\d+$" (car dls)))) (tester (string->number (car dls)))
+		;clock number
+			) ((set! tm (rex-match? "^[?]$" (car dls))) (list (list-ref clocktime (- itr 1)))
 		;number list
 			) ((set! tm (rex-match? "^((?:\\d\\d?,)*)(\\d\\d?)$" (car dls)))
 				(let*((digstr (rex-sub tm 1)) (digend (list (rex-sub tm 2))) (digits (map string->number
@@ -49,8 +52,8 @@
 			) ((set! tm (rex-match? "^\\*(?:/(\\d\\d?))?$" (car dls)))
 				(do ((i (rang-dw rang) (+ 1 i)) (out '() (if (= 0 (modulo i (tester (asnum tm 1 i)))) (cons i out) out)))
 					((> i (rang-up rang)) out))
-			) (else #f)))
-		) (rec (cdr dls) (cons value out) tm (+ 1 itr)))))))
+			) (else #f))))
+		(rec (cdr dls) (cons value out) tm (+ 1 itr)))))))
 	; add id
 	(mapi (lambda(i b) (cdr (reverse (cons i b))))
 		(filter values (map busy-parse-line (read-lines busy-file)))))
@@ -68,7 +71,6 @@
 (define (busy-hour busy) (list-ref busy 1))
 (define (busy-min busy) (list-ref busy 0))
 
-(define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
 ;parttime like busy-clock but part markered by -1 always true
 ;'(-1 -1 -1 -1 -1) - any busy-clock value
