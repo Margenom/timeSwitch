@@ -11,20 +11,9 @@
 (define rang-up cdr)
 (define rang-dw car)
 (define (ranged val rang) (min (rang-up rang) (max (rang-dw rang) val)))
-
-;work only with sorned lists (step 1, mark's length less than 8)
-(define (print-ranged lst range mark) 
-	(do ((i (rang-dw range) (+ i 1)) (ost lst (if (and (not (null? ost)) (> i (car ost))) (cdr ost) ost)))
-			((> i (rang-up range)) (newline))
-		(display (if (or (null? ost) (< i (car ost))) (format #f " ~2D " i) (format #f "<~2D>" mark)))))
-;vertical variant
-(define*(print-ranges lsts range marks (allow_print_range #t))
-	(do ((i (rang-dw range) (+ i 1)) 
-				(ost lsts (map (lambda(rng) (if (and (not (null? rng)) (> i (car rng))) (cdr rng) rng)) ost)))
-			((> i (rang-up range)) (newline)) (let (
-				(ini (map (lambda(rng mark) (if (or (null? rng) (< i (car rng))) "  , " (format #f "~2D, " mark))) ost marks)))
-		(apply print (if allow_print_range (format #f "~2D: " i) "") ini))))
 (define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
+
+
 
 (define*(busy-load busy-file (clocktime (busy-clock (clock-seconds))))
 (define (busy-parse-line line)
@@ -84,12 +73,26 @@
 (define (busy-hour busy) (list-ref busy 1))
 (define (busy-min busy) (list-ref busy 0))
 
+;patch (<id here> . <data patch>)
 (define (list-patch lst . patches) (let rec((ost lst) (itr 0))
 	(if (null? ost) '() (let ((patch (assoc itr patches))(tail (rec (cdr ost) (+ itr 1))))
-		(if patch (cons (cdr patch) tail) tail)))))
+		(cons (if patch (cdr patch) (car ost)) tail)))))
 
 ;parttime like busy-clock but part markered by -1 always true
 ;'(-1 -1 -1 -1 -1) - any busy-clock value
 (define (busy-parttime? busy parttime) (apply and (map (lambda(t b)
 	(if (negative? t) #t (list? (member t b)))) parttime (busy-time busy))))
 (define (busy-now? busy now) (busy-parttime? busy (busy-clock now)))
+
+;work only with sorned lists (step 1, mark's length less than 8)
+(define (print-ranged lst range mark) 
+	(do ((i (rang-dw range) (+ i 1)) (ost lst (if (and (not (null? ost)) (> i (car ost))) (cdr ost) ost)))
+			((> i (rang-up range)) (newline))
+		(display (if (or (null? ost) (< i (car ost))) (format #f " ~2D " i) (format #f "<~2D>" mark)))))
+;vertical variant
+(define*(print-ranges lsts range marks (allow_print_range #t))
+	(do ((i (rang-dw range) (+ i 1)))
+			((> i (rang-up range)) (newline)) (let (
+				(ini (map (lambda(rng mark) (if (or (null? rng) (not (list? (member i rng)))) "  , " (format #f "~2D, " mark))) lsts marks)))
+		(apply print (if allow_print_range (format #f "~2D: " i) "") ini))))
+(define (busy-print b) (print (busy-id b) ":\t" (busy-length b) "'\t" (busy-name b)))
