@@ -17,6 +17,13 @@
 	(do ((i (rang-dw range) (+ i 1)) (ost lst (if (and (not (null? ost)) (> i (car ost))) (cdr ost) ost)))
 			((> i (rang-up range)) (newline))
 		(display (if (or (null? ost) (< i (car ost))) (format #f " ~2D " i) (format #f "<~2D>" mark)))))
+;vertical variant
+(define*(print-ranges lsts range marks (allow_print_range #t))
+	(do ((i (rang-dw range) (+ i 1)) 
+				(ost lsts (map (lambda(rng) (if (and (not (null? rng)) (> i (car rng))) (cdr rng) rng)) ost)))
+			((> i (rang-up range)) (newline)) (let (
+				(ini (map (lambda(rng mark) (if (or (null? rng) (< i (car rng))) "  , " (format #f "~2D, " mark))) ost marks)))
+		(apply print (if allow_print_range (format #f "~2D: " i) "") ini))))
 (define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
 (define*(busy-load busy-file (clocktime (busy-clock (clock-seconds))))
