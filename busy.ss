@@ -11,6 +11,12 @@
 (define rang-up cdr)
 (define rang-dw car)
 (define (ranged val rang) (min (rang-up rang) (max (rang-dw rang) val)))
+
+;work only with sorned lists (step 1, mark's length less than 8)
+(define (print-ranged lst range mark) 
+	(do ((i (rang-dw range) (+ i 1)) (ost lst (if (and (not (null? ost)) (> i (car ost))) (cdr ost) ost)))
+			((> i (rang-up range)) (newline))
+		(display (if (or (null? ost) (< i (car ost))) (format #f " ~2D " i) (format #f "<~2D>" mark)))))
 (define (busy-clock now) (map (lambda(i) (vector-ref (clock now) i)) '(1 2 3 4 6)))
 
 (define*(busy-load busy-file (clocktime (busy-clock (clock-seconds))))
@@ -71,21 +77,12 @@
 (define (busy-hour busy) (list-ref busy 1))
 (define (busy-min busy) (list-ref busy 0))
 
+(define (list-patch lst . patches) (let rec((ost lst) (itr 0))
+	(if (null? ost) '() (let ((patch (assoc itr patches))(tail (rec (cdr ost) (+ itr 1))))
+		(if patch (cons (cdr patch) tail) tail)))))
 
 ;parttime like busy-clock but part markered by -1 always true
 ;'(-1 -1 -1 -1 -1) - any busy-clock value
 (define (busy-parttime? busy parttime) (apply and (map (lambda(t b)
-	(if (negative? t) #t (list?(member t b)))) parttime (busy-time busy))))
+	(if (negative? t) #t (list? (member t b)))) parttime (busy-time busy))))
 (define (busy-now? busy now) (busy-parttime? busy (busy-clock now)))
-
-;	busy file
-(define (test)
-(map print (map busy-parse-line '(
-	"23 */2 * * * 1032 'Выполняется в 0:23, 2:23, 4:23 и т. д.'"
-	"5 4 * * 2 1032 'Выполняется в 4:05 в воскресенье'"
-	"* 0 1 1 * 1032 'С новым годом!'"
-	"15 10,13 * * 1,4 1032 'Эта надпись выводится в понедельник и четверг в 10:15 и 13:15'"
-	"0-59 * * */44 * 1032 'Выполняется ежеминутно'"
-	"0-59/2 * 3,4,5,23 * * 1032 'Выполняется по чётным минутам'"
-	"1-59/2 * * * * 1032 'Выполняется по нечётным минутам'"
-))))
