@@ -146,77 +146,36 @@
 	(lambda(done) (dlgt-end-stop (dlgd-rec-end done)))
 	(lambda(done) (clock-seconds))
 	(lambda(done) (dlgt-wait-stop (dlgd-free->wait done)))))
+(define dlgd-gen-print (dlgd-make-gen-ret
+	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\t" "'\t" "\n")))
+	(lambda(done) (dlgd-proc-hum done))
+	(lambda(done) (dlgd-rec-hum done))))
 
 ;spec
-(define*(dlg-last-done DLfile (type #f) (full #f)) (define lst (reverse (dlg-load DLfile #t)))
-	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))
-(define (dlg-pretty-print-line agr) (case (car agr)
-	((free) (map (lambda (v e) (display v)(display e))
-		(dlgt-wait-hum (dlgd-free->wait agr)) '("\t" "'\t" "\n")))
-	((rec) (dlgd-rec-hum agr))
-	((proc) (dlgd-proc-hum agr))
-	(else (print agr))))
-(define*(dlg-grep paterns agrd (allow_waits #f))
-	((lambda(filtered) (and (not (null? filtered))
-		(do ((ost filtered (cdr ost)) (out paterns
-		(if (car ost) (map (lambda(v o) (if v (cons v o) o)) (car ost) out) out)))
-			((null? ost) (map reverse  out)))))
-	(let recurs((ost agrd))  (if (null? ost) '() ((lambda(m) (let ((tail (recurs (cdr ost)))) (if m (cons m tail) tail)))
-		(and (car ost) (let ((head (car ost))) (case (car head)
-			((free) (map (lambda(p) (and (rex-match? p (dlgt-wait-mesg (dlgd-free->wait head))) head)) paterns))
-			((proc) (map (lambda(p) (and (rex-match? p (dlgt-begin-descr (dlgd-proc-begin head))) head)) paterns))
-			((rec) (map (lambda(p) (and (or (rex-match? p (dlgt-begin-descr (dlgd-rec-begin head)))
-				(rex-match? p (dlgt-end-comment (dlgd-rec-end head)))) head)) paterns))
-			(else #f)))))))))
+(define*(dlgd-gen-match? patern done (allow_waits #f) (delim "\n"))
+	(define dlgd-gen-context (dlgd-make-gen-ret
+		(lambda(d) (string-append (dlgt-begin-descr (dlgd-rec-begin d)) (if allow_waits 
+				(apply string-append delim (map (lambda(w) (values (dlgt-wait-mesg w) delim)) (dlgd-rec-waits d))) "|") 
+			(dlgt-end-comment (dlgd-rec-end d))))
+		(lambda(d) ((lambda(descr) (if allow_waits 
+			(apply string-append descr (map (lambda(w) (values delim (dlgt-wait-mesg w))) (dlgd-proc-waits d)))
+			descr)) (dlgt-begin-descr (dlgd-proc-begin d))))
+		(lambda(d) (dlgt-wait-mesg (dlgd-free->wait d)))))
+	(rex-match? patern (dlgd-gen-context done)))
+
+; return named groups ((patern dones...) next...)
+(define (dlg-grep paterns dones allow_waits) (map cons paterns (let rec((ost dones))
+		(if (null? ost) (make-list (length paterns) '()) 
+			(map (lambda(p t) (if (dlgd-gen-match? p (car ost) allow_waits) (cons (car ost) t) t)) 
+					 paterns (rec (cdr ost)))))))
+; require unnamed groups ((dones...) next...)
 (define*(dlg-patical-length groups)
 	(define gen-length-in-groups (map (lambda(group) (apply + (map dlgd-gen-length group))) groups))
 	(define total-group-length (apply + gen-length-in-groups))
 	(map (lambda(gl) (/ gl 1. total-group-length)) gen-length-in-groups))
-(define*(dlg-time-filter agrd secondsago (now (clock-seconds))) (filter (lambda(a) (> (dlgd-gen-start a) (- now secondsago))) agrd))
-; any from end
-(define (dlg-uncomplite parsed) (let rec((ost (reverse parsed)) (out '()))
-	(if (or (null? ost) (and (car ost) (string=? (caar ost) ">"))) out (rec (cdr ost) (cons (car ost) out)))))
 
-(define (test)
-;	log file, record consist from:
-;	- begin_utime
-;	- planed_length copy from busy file but in sec
-; - description also copy
-;	- waits while waits will be split into parts like begin_utime and length.. no begin and end,name
-;		- begin_utime
-;		<- length = end_utime - begin_utime
-;		>- end_utime
-;		- name
-;	- end_utime
-;	<- length = end_utime - begin_utime - (sum waits.end_utime - waits.begin_utime)
-;	- comment
-(define tdl (map dlg-parse-line '(
-; begin :pass but ignore
-	"<3945348953	3434	какаето запись еаввлпво"
-; use it
-	"<3945348953	3434	какаето запись еаввлпво"
-; correct=head+tail :pass
-	"	3453634543	5748379863	какаето запись еаввлпво"
-; correct+tail :pass
-	"	3453634543	5748379863	какаето запись еаввлпво	5748379863	какаето запись еаввлпво"
-; head+correct :pass
-	"	3453634543	3453634543 5748379863	какаето запись еаввлпво"
-; tail :skip
-	"	5748379863	какаето запись еаввлпво"
-; head+end+tail :skip
-	"	3453634543 >3945348953	1434	какаето запиslfkсь еаввлпво	5748379863	какаето запись еаввлпво"
-; correct :pass
-	"	3455930853	3453459863	какdsfjаето запись еаввлпво"
-; end+tail :pass
-	">3945348953	1434	какаето запиslfkсь еаввлпво	5748379863	какаето запись еаввлпво"
-; begin :pass  but ignore
-	"<4536747453	0434	какаето запись sldfjеаввлпво"
-; head+begin+tail :skip
-	"	3453634543<3945348953	4434	какаето запись еаввлпво	5748379863	какаето запись еаввлпво"
-)))
-(map print tdl)
-(define argtdl(dlg-agregate tdl))
-(map print argtdl )
-(print (dlg-record-planed-diff (car argtdl)))
-(print (dlg-uncomplite (reverse tdl)))
-)
+(define*(dlg-time-filter agrd secondsago (now (clock-seconds))) 
+	(filter (lambda(a) (> (dlgd-gen-start a) (- now secondsago))) agrd))
+
+(define*(dlg-last-done DLfile (type #f) (full #f)) (define lst (reverse (dlg-load DLfile #t)))
+	(and (list? lst) (car lst) (or (not type) (string=? (caar lst) type)) (if full lst (car lst))))

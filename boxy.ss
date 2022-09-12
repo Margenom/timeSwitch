@@ -59,7 +59,7 @@
 			(unless mesg (begin (print "aborting") (exit)))
 			(dlg-app-head DoneLogFile beg)
 			(dlg-app-tail DoneLogFile mesg end)
-			(unless (param-or-val "m" #f)  (notify "Last legth" (string-append (number->string (round (/ (- end beg) 60.))) "min")))
+			(if (param-or-val "m" #f)  (notify "Last legth" (string-append (number->string (round (/ (- end beg) 60.))) "min")))
 			(unless (param-or-val "noshow" #f) (print "Length: " (/(- end beg) 60.) "'"))))
 	)((wait) (part-check) (args-check #f) ;mesg
 		(unless (param-or-val "g" #f) (display "Stop C-c, in args or mesg: "))
@@ -71,12 +71,12 @@
 			(dlg-app-head DoneLogFile start)
 			(dlg-app-tail DoneLogFile (if (string=? "" inpstring) inpstring clistring) stop))))
 ;other
-	)((showall) (args-check 0) (map dlg-pretty-print-line (Ago-filter))
-	)((stat) (args-check 0) (map dlg-pretty-print-line (Ago-filter 604800))
+	)((showall) (args-check 0) (map dlgd-gen-print (Ago-filter))
+	)((stat) (args-check 0) (map dlgd-gen-print (Ago-filter 604800))
 	)((parts) (args-check #f) (let ((paterns (cddr CLI_ARGS)))
 		(if (null? paterns) (begin (print "No paterns") (exit))) (let*(
 				(total (Ago-filter 604800))
-				(groups (map cdr (filter list? (dlg-grep paterns total))))
+				(groups (map cdr (filter list? (dlg-grep paterns total #f))))
 				(partical (dlg-patical-length groups)))
 			(map (lambda(p t) (print p "\t" (round (* 100 t)) "%")) paterns partical)
 			(print "Total(sum all groups) time: " (round (/ (apply + (map (lambda(g) (apply + (map dlgd-gen-length g))) groups)) 3600.)) " ч.")
