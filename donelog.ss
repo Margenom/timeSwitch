@@ -147,9 +147,9 @@
 	(lambda(done) (clock-seconds))
 	(lambda(done) (dlgt-wait-stop (dlgd-free->wait done)))))
 (define dlgd-gen-print (dlgd-make-gen-ret
-	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\t" "'\t" "\n")))
+	(lambda(done) (dlgd-rec-hum done))
 	(lambda(done) (dlgd-proc-hum done))
-	(lambda(done) (dlgd-rec-hum done))))
+	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\t" "'\t" "\n")))))
 
 ;spec
 (define*(dlgd-gen-match? patern done (allow_waits #f) (delim "\n"))

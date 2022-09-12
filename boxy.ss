@@ -12,7 +12,10 @@
 
 ;paths
 (define (BoxyHome path) (string-append CLI_PATH "/" path))
-(define (BusyHome path) (string-append (getenv "HOME") "/me/" path))
+(define BusyHome (let*(
+		(closedir (getenv "MYCLOSEDIR"))
+		(busyhome (if (string=? "" closedir) (getenv "HOME") closedir)))
+	(lambda(path) (string-append busyhome "/" path))))
 (define DoneLogFile (BusyHome ".donelog"))
 (define Busy (busy-load (BusyHome "busy.set")))
 
@@ -38,13 +41,16 @@
 		(dlg-app-begin DoneLogFile (list-ref Busy (string->number (list-ref CLI_ARGS 2))))
 	)((list)  (args-check #f) (map (lambda(b)
 		(if (or (null? (cddr CLI_ARGS)) (apply and (map (lambda(r) (list? (rex-match? r (busy-name b)))) cldata)))
-			(print (busy-id b) ":\t" (busy-length b) "\t" (busy-name b)))) Busy)
-	)((timer) (part-check) (proc-check) (args-check #f) ;system command
-		(print (apply string-join " " (cddr CLI_ARGS)))
+			(print (busy-id b) ":\t" (busy-length b) "'\t" (busy-name b)))) Busy)
+	)((timer) (part-check) (need-args? 1 1 -1) (let ((busy (list-ref Busy (string->number (list-ref CLI_ARGS 2)))))
+		(dlg-app-begin DoneLogFile busy)
+		(delay (* 60 (busy-length busy)))
+		(unless (param-or-val "m" #f)  (notify "Time is out" (string-append (busy-name busy) "\n" (number->string (busy-length busy)) "min")))
+		(print (apply string-join " " (cddr CLI_ARGS))))
 	)((end) (proc-check not "boxy no started") (part-check) (args-check #f) ;comment
 		(dlg-app-end DoneLogFile (apply string-join " " (cddr CLI_ARGS)) )
 	)((now) (args-check 0) (map (lambda(b)
-		(if (busy-now? b (clock-seconds)) (print (busy-id b) ":\t" (busy-length b) "\t" (busy-name b)))) Busy)
+		(if (busy-now? b (clock-seconds)) (print (busy-id b) ":\t" (busy-length b) "'\t" (busy-name b)))) Busy)
 	)((check) (args-check 0)
 	)((cron) (args-check 0) (map (lambda(b)
 		(if (busy-now? b (clock-seconds)) (notify "Task" (busy-name k)))) Busy)
