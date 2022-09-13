@@ -101,13 +101,13 @@
 	(define beg (dlgd-rec-begin done))
 	(define end (dlgd-rec-end done))
 	(define waits (dlgd-rec-waits done))
-	(print (clock-pretty (dlgt-begin-start beg)) "\t" (secs->mins (dlgd-rec-planed-diff done)) "'\t" (dlgt-begin-descr beg))
-	(print 	(secs->mins (- (dlgt-end-stop end)
+	(print (clock-pretty (dlgt-begin-start beg)) "\tp: " (secs->mins (dlgd-rec-planed-diff done)) "'\td: " (dlgt-begin-descr beg))
+	(print "b: " (secs->mins (- (dlgt-end-stop end)
 	(let rec((w waits) (ltime (dlgt-begin-start beg)))
 		(if (null? w) ltime (begin
-			(print "\t" (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\t" (secs->mins (dlgt-wait-length (car w))) "'\t" (dlgt-wait-mesg (car w)))
+			(print "\tb: " (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\tl: " (secs->mins (dlgt-wait-length (car w))) "'\tc: " (dlgt-wait-mesg (car w)))
 			(rec (cdr w) (dlgt-wait-end (car w))))))
-		)) "'\t" (secs->mins (dlgd-rec-length done)) "'\t" (dlgt-end-comment end)))
+		)) "' \tl: " (secs->mins (dlgd-rec-length done)) "'\tt: " (secs->mins (- (dlgt-end-stop end) (dlgt-begin-start beg))) "'\tm: " (dlgt-end-comment end)))
 
 ;proc - deal in process, record without end
 (define (dlgd-proc-check? DLfile) (dlg-befois-check? DLfile 'proc))
@@ -122,15 +122,15 @@
 (define*(dlgd-proc-hum done (now (clock-seconds)))
 	(define beg (dlgd-proc-begin done))
 	(define waits (dlgd-proc-waits done))
-	(print (clock-pretty (dlgt-begin-start beg)) "\t" (secs->mins (dlgd-proc-planed-diff done now)) "'\t" (dlgt-begin-descr beg))
-	(print 	(secs->mins (- now
+	(print (clock-pretty (dlgt-begin-start beg)) "\tp: " (secs->mins (dlgd-proc-planed-diff done now)) "'\td: " (dlgt-begin-descr beg))
+	(print "b: "	(secs->mins (- now
 	(let rec((w waits) (ltime (dlgt-begin-start beg)))
 		(if (null? w) ltime (begin
-			(map display (list "\t" (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\t"))
+			(map display (list "\tb: " (secs->mins (- (dlgt-wait-start (car w)) ltime)) "'\tl: "))
 			(if (dlgd-part-check? (car w)) (begin (newline) (rec (cdr w) ltime)) (begin
-				(print (secs->mins (dlgt-wait-length (car w))) "'\t" (dlgt-wait-mesg (car w)))
+				(print (secs->mins (dlgt-wait-length (car w))) "'\tc: " (dlgt-wait-mesg (car w)))
 				(rec (cdr w) (dlgt-wait-end (car w))))))))
-		)) "'\t" (secs->mins (dlgd-proc-length done now)) "'"))
+		)) "'\tl: " (secs->mins (dlgd-proc-length done now)) "'t: " (secs->mins (- now (dlgt-begin-start beg)))))
 ;free - wait un deal
 (define (dlgd-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 ;unification or generaly
@@ -149,7 +149,7 @@
 (define dlgd-gen-print (dlgd-make-gen-ret
 	(lambda(done) (dlgd-rec-hum done))
 	(lambda(done) (dlgd-proc-hum done))
-	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\t" "'\t" "\n")))))
+	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\tl: " "'\tc: " "\n")))))
 
 ;spec
 (define*(dlgd-gen-match? patern done (allow_waits #f) (delim "\n"))
