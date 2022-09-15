@@ -134,22 +134,27 @@
 ;free - wait un deal
 (define (dlgd-free->wait done) (and (eq? (car done) 'free) (cdr done)))
 ;unification or generaly
-(define (dlgd-make-gen-ret lrec lproc lfree) (lambda(done) (case (car done)
-	((rec) (lrec done)) ((proc) (lproc done)) ((free) (lfree done)) (else #f))))
+(define (dlgd-make-gen-ret lrec lproc lfree lpart) (lambda(done) (case (car done)
+	((rec) (lrec done)) ((proc) (lproc done)) ((free) (lfree done)) ((part) (lpart done)) (else #f))))
 (define dlgd-gen-start (dlgd-make-gen-ret
 	(lambda(done) (dlgt-begin-start (dlgd-rec-begin done)))
 	(lambda(done) (dlgt-begin-start (dlgd-proc-begin done)))
-	(lambda(done) (dlgt-wait-start (dlgd-free->wait done)))))
+	(lambda(done) (dlgt-wait-start (dlgd-free->wait done)))
+	(lambda(done) (cadr done))))
 (define dlgd-gen-length (dlgd-make-gen-ret
-	dlgd-rec-length  dlgd-proc-length (lambda(done) (dlgt-wait-length (dlgd-free->wait done)))))
+	dlgd-rec-length  dlgd-proc-length (lambda(done) (dlgt-wait-length (dlgd-free->wait done)))
+	(lambda(done) (- (clock-seconds) (cadr done)))))
 (define dlgd-gen-stop (dlgd-make-gen-ret
 	(lambda(done) (dlgt-end-stop (dlgd-rec-end done)))
 	(lambda(done) (clock-seconds))
-	(lambda(done) (dlgt-wait-stop (dlgd-free->wait done)))))
+	(lambda(done) (dlgt-wait-stop (dlgd-free->wait done)))
+	(lambda(done) (clock-seconds))))
 (define dlgd-gen-print (dlgd-make-gen-ret
 	(lambda(done) (dlgd-rec-hum done))
 	(lambda(done) (dlgd-proc-hum done))
-	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\tl: " "'\tc: " "\n")))))
+	(lambda(done) (map (lambda (v e) (display v)(display e)) (dlgt-wait-hum (dlgd-free->wait done)) '("\tl: " "'\tc: " "\n")))
+	(lambda(done) (print (clock-pretty (dlgd-gen-start done))  
+		"'\tl: " (secs->mins (- (dlgd-gen-stop done) (dlgd-gen-start done))) "'"))))
 
 ;spec
 (define*(dlgd-gen-match? patern done (allow_waits #f) (delim "\n"))

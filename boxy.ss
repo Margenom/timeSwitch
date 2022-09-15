@@ -78,6 +78,7 @@
 			(mesg (if (param-or-val "g" #f) 
 				(gui-input-mesg "Tell me what you do") 
 				(apply string-join " " (cddr CLI_ARGS)))))
+		(unless mesg (exit))
 		(dlg-app-tail DoneLogFile mesg))
 	)((next) (args-check #f) (let ((last (dlg-last-done DoneLogFile "\t")))
 			(unless last (begin (print "last is no done") (exit))) 
