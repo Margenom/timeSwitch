@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS "byplan" (
 -- log what you do
 CREATE TABLE IF NOT EXISTS "donelog" (
 	"begin"	INTEGER NOT NULL, -- utime
-	"end"	INTEGER NOT NULL, -- utime 
-	"comment"	TEXT NOT NULL,
+	"end"	INTEGER, -- utime 
+	"comment"	TEXT,
 	PRIMARY KEY("begin")
 );
 -- plans
@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS "tasks" (
 	"length"	INTEGER NOT NULL, -- in secs
 	"flags"	INTEGER DEFAULT 0, -- use for hide old records and so more
 	"period"	TEXT, -- any that define period (cron or same more usefull)
--- format period(cron): "cron:* * * * *"
+-- format period(cron): "* * * * *"
+	"pertype" INTEGER DEFAULT 0, -- 0 - cron, 1+ some more
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
 COMMIT;
