@@ -60,6 +60,10 @@ about-include "database" "here your database"
 # Какие каманды действительно нужны и в каком виде?
 # управление думаю следует сделать орентируясь не на будет выполнено, а было выполнено как с записями в more
 # те создал я значит какойто процес я могу задать ему чем он будет
+# start - переводит систему в состояние ожидания ответа (ставит отметку начала)
+set SQL_start {INSERT donelog(begin) SELECT strftime('%s');}
+# muts [<length>] - создаёт плановое событие и связывает с задачей для выполнения
+set SQL_must {}
 # next <mesg> - задаёт что с предидущей отметки я допустим гулял
 set SQL_next {INSERT donelog(begin, end, comment)
 	SELECT end, strftime('%s'), ? 
@@ -67,68 +71,46 @@ set SQL_next {INSERT donelog(begin, end, comment)
 	ORDER BY begin DESC
 	WHERE end IS NOT NULL
 	LIMIT 1;} 
-# last <id> - связывает это с прогулкой (что дажача по здоаовью) (возможно вместо id следует использовать имена)
-set SQL_last {INSERT byplan(done, task)
-	SELECT begin, ?
-	FROM donelog
-	ORDER BY begin DESC
-	LIMIT 1;} 
-# stun - переводит систему в состояние ожидания ответа (ставит отметку начала)
-set SQL_stun {INSERT donelog(begin) SELECT strftime('%s');}
-# tell <mesg> - выводит систему из того состояния в коем прибывал (дополняет запись)
-set SQL_tell {UPDATE donelog SET end = strftime('%s'), comment = ? 
+# думаеться мне что следует сделать иерархию временных отрезков (всё переделывать, опять)
+#	- задачи - длительность, описание, id - список возможных к выполнению задач
+#		- плановое событие - начало, желаемая длительность, описание - запланированный длительный (обычно) процесс 
+#		что может прирываться обычными
+# 			- обычное событие - начало, конец (длина), сообщение - ветви, потомков неимеют
+# хаотичной системе управления временем не нужны периуды, используй календарь
+# sub <id>- вклинивает задачу как подзадачу выполняемой
+# list - список выполняемых задач
+set SQL_list {SELECT * FROM donelog WHERE end IS NULL;}
+# need <length> <description> - создаёт задачу и плановое событие
+# end <id> <comment> - завершает и подругому никак выполнение планового события задачи id
+set SQL_end {UPDATE donelog SET end = strftime('%s'), comment = ? 
 	FROM (SELECT begin AS last 
 		FROM donelog
 		ORDER BY begin DESC
 		WHERE end IS NULL 
 		LIMIT 1)
 	WHERE begin = last;}
-# думаеться мне что следует сделать иерархию временных отрезков (всё переделывать, опять)
-#	- задачи - длительность, описание, id - список возможных к выполнению задач
-#		- плановое событие - начало, желаемая длительность, описание - запланированный длительный (обычно) процесс 
-#		что может прирываться обычными
-# 			- обычное событие - начало, конец (длина), сообщение - ветви, потомков неимеют
-# task <length> <description> - вопрос а нужна ли мне переодичность что это даёт (окно что можно пропустить, не такли?)
-set SQL_task {INSERT tasks(length, descriprion) VALUES(?, ?);}
-# хаотичной системе управления временем не нужны периуды, используй календарь
-# list [<pattern>] - возврашает таблицу с id по шаблону отфильтрованных задач
-set SQL_list {SELECT * FROM tasks WHERE flag = 0;}
-# need <length> <description> - создаёт задачу и плановое событие
-# muts <id> [<length>] - создаёт плановое событие и связывает с задачей для выполнения
-# end <id> <comment> - завершает и подругому никак выполнение планового события задачи id
-# hide <id> - скрывает задачу из списка, их нельзя удалять тк дркгие записи с ними связаны что может привести к непонятному поведению
-set SQL_hide {UPDATE tasks SET flag = 1 WHERE begin = ?;}
-# restore <id> - у спрятанных занисей id сохраняеться навсегда и они могут сново отображаться в списке
-set SQL_hide {UPDATE tasks SET flag = 0 WHERE begin = ?;}
 # Здась может потребоваться некоторое количество графических интерфейсов и для их реализации предпочтительнее tk
 # за сим следует перенести эту систему на tcl так это даст больше преимуществ для её эксплуатации
+# stat [-l=<cicle length>] <filtr pattern> - выводит записи за системный цикл
+set SQL_stat {SELECT * FROM donelog WHERE;}
+# parts [-l=<cicle length>] <patern> [.. <paternN>] - выводит процент шаблона от периода и от других шаблонов (с верменем)
+set SQL_part {SELECT * FROM donelog WHERE;}
 
 
 set MakeDB {
 BEGIN TRANSACTION;
--- planed dones
-CREATE TABLE IF NOT EXISTS "byplan" (
+-- special values for donelogs
+CREATE TABLE IF NOT EXISTS "slots" (
 	"done"	INTEGER,
-	"task"	INTEGER,
+	"slot"	INTEGER,
+	"value" TEXT,
 	FOREIGN KEY("done") REFERENCES "donelog"("begin"),
-	FOREIGN KEY("task") REFERENCES "tasks"("id")
 );
 -- log what you do
 CREATE TABLE IF NOT EXISTS "donelog" (
 	"begin"	INTEGER NOT NULL, -- utime
 	"end"	INTEGER, -- utime 
-	"comment"	TEXT,
+	"mesg"	TEXT,
 	PRIMARY KEY("begin")
-);
--- plans
-CREATE TABLE IF NOT EXISTS "tasks" (
-	"id"	INTEGER,
-	"description"	TEXT NOT NULL,
-	"length"	INTEGER NOT NULL, -- in secs
-	"flags"	INTEGER DEFAULT 0, -- use for hide old records and so more
---	"period"	TEXT, -- any that define period (cron or same more usefull)
--- format period(cron): "* * * * *"
---	"pertype" INTEGER DEFAULT 0, -- 0 - cron, 1+ some more
-	PRIMARY KEY("id" AUTOINCREMENT)
 );
 COMMIT;}
