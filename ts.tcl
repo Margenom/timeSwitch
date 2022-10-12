@@ -46,24 +46,6 @@ proc about-switch {categ} { global ABOUT;
 	set ABOUT "$ABOUT$categ\n";
 }
 
-set MakeBase {
-BEGIN TRANSACTION;
--- special values for donelogs
-CREATE TABLE IF NOT EXISTS "slots" (
-	"done"	INTEGER,
-	"slot"	INTEGER,
-	"value" TEXT,
-	FOREIGN KEY("done") REFERENCES "donelog"("begin")
-);
--- log what you do
-CREATE TABLE IF NOT EXISTS "donelog" (
-	"begin"	INTEGER NOT NULL, -- utime
-	"end"	INTEGER, -- utime 
-	"mesg"	TEXT,
-	PRIMARY KEY("begin")
-);
-COMMIT;}
-
 # configuration
 about-switch "Config"
 about-include "database" "location of your database" 
@@ -82,6 +64,24 @@ proc params-check pamlist { set bpam 1; global CLI_PARAMS
 	}
 	return $bpam
 }
+
+set MakeBase {
+BEGIN TRANSACTION;
+-- special values for donelogs
+CREATE TABLE IF NOT EXISTS "slots" (
+	"done"	INTEGER,
+	"slot"	INTEGER, -- 0: up, 1: length
+	"value" TEXT,
+	FOREIGN KEY("done") REFERENCES "donelog"("begin")
+);
+-- log what you do
+CREATE TABLE IF NOT EXISTS "donelog" (
+	"begin"	INTEGER NOT NULL, -- utime
+	"end"	INTEGER, -- utime 
+	"mesg"	TEXT,
+	PRIMARY KEY("begin")
+);
+COMMIT;}
 
 about-switch "Commands"
 set COMMANDS [list]
@@ -113,63 +113,106 @@ proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 	# execute command
 	if {$args} [lindex $cmd 3] $fail
 }
-	
-# actions
+
 # более гибкая система команд из-за чего всё не скатываеться в мешанину
 # Какие каманды действительно нужны и в каком виде?
 # управление думаю следует сделать орентируясь не на будет выполнено, а было выполнено как с записями в more
 # те создал я значит какойто процес я могу задать ему чем он будет
-about-command {start}\
-	{переводит систему в состояние ожидания ответа (ставит отметку начала)}
-command-collect start 0 0 {
-	set SQL_start {INSERT donelog(begin) SELECT strftime('%s');}
-	puts "start"
-}	
-about-command {must <length>}\
-	{создаёт плановое событие и связывает с задачей для выполнения}
-command-collect must 1 0 {
-	puts [db eval "select 5+3;"]
-}	
-about-command {next <mesg> [.. <mesg parts>]}\
-	{задаёт что с предидущей отметки я допустим гулял}
-command-collect next 1 -1 {
-set SQL_next {INSERT donelog(begin, end, comment)
-	SELECT end, strftime('%s'), ? 
-	FROM donelog
-	ORDER BY begin DESC
-	WHERE end IS NOT NULL
-	LIMIT 1;}
-	puts "$adata"
+# actions
+about-command {stun}\
+	{запись выполнения нового задания}
+command-collect stun 0 0 {
+	db eval "INSERT INTO donelog(begin) SELECT strftime('%s');"
 }
-about-command {list <pattern>}\
-	{список выполняемых задач}
-command-collect list 0 1 {
-set SQL_list {SELECT * FROM donelog WHERE end IS NULL;}
-	puts "list"
+
+about-command {must <length>}\
+	{запись выполнения нового задания с заданной длиной}
+command-collect must 1 0 {
+	set sec [clock seconds]
+	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
+	db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $adata);"
 }	
+
+about-command {sub <id>}\
+	{вклинивает задачу как подзадачу выполняемой}
+command-collect sub 1 0 {
+	set up [db eval "SELECT begin
+	FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin 
+		FROM donelog 
+		WHERE end IS NULL)
+	WHERE id = $adata;"]
+
+	if [string eq $up ""] exit 
+	set sec [clock seconds]
+	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
+	db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 0, $up);"
+}
+
+about-command {tell <id> <mesg> [.. <mesg parts>]}\
+	{завершает задачу}
+command-collect tell 1 -1 {
+	set sec [clock seconds]
+	set id [lindex $adata 0]
+	set mesg [lrange $adata 1 end]
+	db eval "UPDATE OR IGNORE donelog
+	SET mesg = '$mesg', end = $sec
+	FROM (SELECT begin AS done, row_number() OVER (ORDER BY begin) AS id 
+		FROM donelog)
+	WHERE id = $id AND done = begin;"
+}
+
+about-command {next <mesg> [.. <mesg parts>]}\
+	{отмечает время от конца последней завершенной задачи как повую задачу}
+command-collect next 1 -1 {
+	db eval "INSERT INTO donelog(begin, end, mesg)
+	SELECT end, strftime('%s'), '$adata'
+	FROM donelog
+	WHERE end IS NOT NULL
+	ORDER BY begin DESC
+	LIMIT 1;"
+}
+
 # думаеться мне что следует сделать иерархию временных отрезков (всё переделывать, опять)
 #	- задачи - длительность, описание, id - список возможных к выполнению задач
 #		- плановое событие - начало, желаемая длительность, описание - запланированный длительный (обычно) процесс 
 #		что может прирываться обычными
 # 			- обычное событие - начало, конец (длина), сообщение - ветви, потомков неимеют
-about-command {sub <id>}\
-	{вклинивает задачу как подзадачу выполняемой }
-command-collect sub 1 0 {
-	puts "sub"
-}	
 # information
+about-command {list <pattern>}\
+	{список выполняемых задач}
+command-collect list 0 1 {
+	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value, '\n'
+	FROM donelog LEFT JOIN slots ON done = begin
+	WHERE end IS NULL;" {
+		switch $slot {
+			0 { set more "up:$value"}
+			1 { set more "len:[expr $value/60]'"}
+			default { set more ""}
+		}
+		puts "$id: [time-format $begin]: {$more}"
+	}
+}
+
 about-command {stat [<filter pattern>]}\
-	{выводит записи за системный цикл}
+	{выводит завершенные записи за установренный рабочий цикл}
 command-collect stat 0 1 {
-	set SQL_stat {SELECT * FROM donelog WHERE;}
-	puts "stat"
-}	
+	db eval "SELECT begin, end - begin AS len, mesg, slot, value 
+	FROM donelog LEFT JOIN slots ON done = begin
+	WHERE end IS NOT NULL;"  {
+			switch $slot {
+				0 { set more "up:$value"}
+				1 { set more "len:[expr $value/60]'"}
+				default {set more ""}
+			}
+		puts "[expr $len/60]' [time-format $begin] {$more}\n\t $mesg"
+	}
+}
+
 about-command {parts <pattern> [.. <next pattern>]}\
 	{выводит процент шаблона от периода и от других шаблонов (с верменем)}
 command-collect parts 1 -1 {
-	set SQL_part {SELECT * FROM donelog WHERE;}
-	puts "parts"
-}	
+	puts [db eval "SELECT *,'\n' FROM donelog LEFT JOIN slots ON done = begin;"]
+}
 
 #if {![params-check database] || [llength $CLI_ARGS] == 0} {help-gen; exit}
 command-exec {help-gen; exit}
