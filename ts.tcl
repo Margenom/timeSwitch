@@ -55,6 +55,7 @@ proc show-slot {slot value} {
 		default {return ""}
 	}
 }
+proc notify-send {title mesg} { exec notify-send $title $mesg}
 
 proc help-gen {} {global ABOUT; puts $ABOUT}
 # req_params is list of names required params
@@ -130,9 +131,8 @@ command-collect do 0 1 {do [<length, in mins>]} {
 
 command-collect sub 1 1 {sub <id> [<length>]} {
 	set up [db eval "SELECT begin
-	FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin 
-		FROM donelog 
-		WHERE end IS NULL)
+	FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
+		FROM donelog WHERE end IS NULL)
 	WHERE id = [lindex $adata 0];"]
 	if [string eq $up ""] exit 
 	set sec [clock seconds]
@@ -144,28 +144,33 @@ command-collect sub 1 1 {sub <id> [<length>]} {
 	}
 } {вклинивает задачу как подзадачу выполняемой}
 
-command-collect end 2 -1 {end <id> <mesg> [.. <mesg parts>]} {
+command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]} {
 	set sec [clock seconds]
 	set id [lindex $adata 0]
 	set mesg [lrange $adata 1 end]
 	db eval "UPDATE OR IGNORE donelog
 	SET mesg = '$mesg', end = $sec
-	FROM (SELECT begin AS done, row_number() OVER (ORDER BY begin) AS id 
-		FROM donelog)
+	FROM (SELECT row_number() OVER (ORDER BY begin) AS id, begin AS done
+		FROM donelog WHERE end IS NULL)
 	WHERE id = $id AND done = begin;"
-	puts "Taken [db eval "SELECT (end-begin)/60 FROM donelog 
-	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]'"
+	set len [db eval "SELECT (end-begin)/60 FROM donelog 
+	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
+	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
+	puts "Taken $len'"
 } {завершает задачу}
 
-command-collect app 1 -1 {app <mesg> [.. <mesg parts>]} {
+command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <mesg> [.. <mesg parts>]} {
 	db eval "INSERT INTO donelog(begin, end, mesg)
 	SELECT end, strftime('%s'), '$adata'
-	FROM donelog
-	WHERE end IS NOT NULL
-	ORDER BY begin DESC
-	LIMIT 1;"
-	puts "Taken [db eval "SELECT (end-begin)/60 FROM donelog 
-	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]'"
+	FROM donelog JOIN (SELECT row_number() OVER (ORDER BY begin DESC) AS id, begin AS done
+		FROM donelog
+		WHERE end IS NOT NULL) ON done = begin
+	WHERE id = ([pamVal o 0] +1)
+	ORDER BY begin DESC"
+	set len [db eval "SELECT (end-begin)/60 FROM donelog
+	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
+	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
+	puts "Taken $len'"
 } {отмечает время от конца последней завершенной задачи как повую задачу}
 
 # information
