@@ -11,9 +11,9 @@
 		вклинивает задачу как подзадачу выполняемой
 	sub <id> [<length>]
 		завершает задачу
-	end <id> <mesg> [.. <mesg parts>]
+	end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]
 		отмечает время от конца последней завершенной задачи как повую задачу
-	app <mesg> [.. <mesg parts>]
+	app [-n notification] [-g gui input] [-o=<offset>] <mesg> [.. <mesg parts>]
 		список выполняемых задач
 	wil
 		выводит завершенные записи за установренный рабочий цикл
