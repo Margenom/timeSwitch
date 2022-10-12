@@ -14,8 +14,6 @@ foreach p $argv { if [regexp -- {^-([^=]+)(?:=(.+))?$} $p all pname pval] {
 	lappend CLI_PARAMS [list $pname $pval] 
 } else { lappend CLI_ARGS $p} }
 
-
-
 # param or value
 proc pamVal {name {orval false} {convert 0} {empty_val true}} {
 	global CLI_PARAMS
@@ -39,21 +37,17 @@ proc about-include {name about {def ""} {defhum ""}} { global ABOUT; global CLI_
 	} else { set ln "-$name=$mval"}
 	set ABOUT "$ABOUT\t$ln\n"
 }
-proc about-command {usage about} { global ABOUT;
-	set ABOUT "$ABOUT\t\t$about\n\t$usage\n";
-}
-proc about-switch {categ} { global ABOUT;
-	set ABOUT "$ABOUT$categ\n";
-}
+proc about-command {usage about} { global ABOUT; set ABOUT "$ABOUT\t\t$about\n\t$usage\n"; }
+proc about-switch {categ} { global ABOUT; set ABOUT "$ABOUT$categ\n"; }
 
 # configuration
 about-switch "Config"
-about-include "database" "location of your database" 
-about-include "cicle" "length of your work cicle (in sec)" [expr 3600*24*7] 
+about-include database "location of your database" 
+about-include cicle "length of your work cicle (in sec)" [expr 3600*24*7] 
 about-include timeformat "print time format" "%a %d.%m (%Y) %H:%M {%s}"
 proc time-format {timesec} { return [clock format $timesec -format [pamVal timeformat]]}
-about-include timescan "user scan time format" "%Y%m%d%H%M"
-proc time-format-scan {timeline} { return [clock scan $timeline -format [pamVal timescan]]}
+#about-include timescan "user scan time format" "%Y%m%d%H%M"
+#proc time-format-scan {timeline} { return [clock scan $timeline -format [pamVal timescan]]}
 proc show-slot {slot value} {
 	switch $slot {
 		0 { return "up:$value"}
@@ -102,11 +96,11 @@ proc command-collect {name require optional usage body descr} { global COMMANDS
 proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 	set cmd [lsearch -index 0 $COMMANDS [lindex $CLI_ARGS 0]]
 	if {$cmd == -1} $fail 
-	set cmd [lindex $COMMANDS $cmd]
 
-	set offset 1
+	set cmd [lindex $COMMANDS $cmd]
 	set require [lindex $cmd 1]
 	set optional [lindex $cmd 2]
+	set offset 1
 	set alen [expr [llength $CLI_ARGS] - $offset]
 	set args [expr ($alen >= $require) && (($alen <= ($optional + $require)) || ($optional < 0))] 
 
