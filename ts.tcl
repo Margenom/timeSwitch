@@ -54,6 +54,13 @@ about-include timeformat "print time format" "%a %d.%m (%Y) %H:%M {%s}"
 proc time-format {timesec} { return [clock format $timesec -format [pamVal timeformat]]}
 about-include timescan "user scan time format" "%Y%m%d%H%M"
 proc time-format-scan {timeline} { return [clock scan $timeline -format [pamVal timescan]]}
+proc show-slot {slot value} {
+	switch $slot {
+		0 { return "up:$value"}
+		1 { return "len:[expr $value/60]'"}
+		default {return ""}
+	}
+}
 
 proc help-gen {} {global ABOUT; puts $ABOUT}
 # req_params is list of names required params
@@ -91,6 +98,7 @@ proc command-collect {name require optional usage body descr} { global COMMANDS
 	lappend COMMANDS [list $name $require $optional $body]
 	about-command $usage $descr
 }
+
 proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 	set cmd [lsearch -index 0 $COMMANDS [lindex $CLI_ARGS 0]]
 	if {$cmd == -1} $fail 
@@ -117,30 +125,32 @@ proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 }
 
 # actions
-command-collect stun 0 0 {stun} {
-	db eval "INSERT INTO donelog(begin) SELECT strftime('%s');"
-} {запись выполнения нового задания}
-
-command-collect must 1 0 {must <length>} {
+command-collect do 0 1 {do [<length, in mins>]} {
 	set sec [clock seconds]
 	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
-	db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $adata);"
-} {запись выполнения нового задания с заданной длиной}
+	if [llength $adata] {
+		set len [expr 60*[lindex $adata 0]]
+		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);"
+	}
+} {запись выполнения нового задания}
 
-command-collect sub 1 0 {sub <id>} {
+command-collect sub 1 1 {sub <id> [<length>]} {
 	set up [db eval "SELECT begin
 	FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin 
 		FROM donelog 
 		WHERE end IS NULL)
-	WHERE id = $adata;"]
-
+	WHERE id = [lindex $adata 0];"]
 	if [string eq $up ""] exit 
 	set sec [clock seconds]
 	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
 	db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 0, $up);"
+	if {[llength $adata] > 1} {
+		set len [expr 60*[lindex $adata 1]]
+		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);"
+	}
 } {вклинивает задачу как подзадачу выполняемой}
 
-command-collect tell 1 -1 {tell <id> <mesg> [.. <mesg parts>]} {
+command-collect end 2 -1 {end <id> <mesg> [.. <mesg parts>]} {
 	set sec [clock seconds]
 	set id [lindex $adata 0]
 	set mesg [lrange $adata 1 end]
@@ -149,45 +159,37 @@ command-collect tell 1 -1 {tell <id> <mesg> [.. <mesg parts>]} {
 	FROM (SELECT begin AS done, row_number() OVER (ORDER BY begin) AS id 
 		FROM donelog)
 	WHERE id = $id AND done = begin;"
+	puts "Taken [db eval "SELECT (end-begin)/60 FROM donelog 
+	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]'"
 } {завершает задачу}
 
-command-collect next 1 -1 {next <mesg> [.. <mesg parts>]} {
+command-collect app 1 -1 {app <mesg> [.. <mesg parts>]} {
 	db eval "INSERT INTO donelog(begin, end, mesg)
 	SELECT end, strftime('%s'), '$adata'
 	FROM donelog
 	WHERE end IS NOT NULL
 	ORDER BY begin DESC
 	LIMIT 1;"
+	puts "Taken [db eval "SELECT (end-begin)/60 FROM donelog 
+	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]'"
 } {отмечает время от конца последней завершенной задачи как повую задачу}
 
 # information
-command-collect list 0 1 {list <pattern>} {
+command-collect wil 0 0 {wil} {
 	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value
 	FROM donelog LEFT JOIN slots ON done = begin
-	WHERE end IS NULL;" {
-		switch $slot {
-			0 { set more "up:$value"}
-			1 { set more "len:[expr $value/60]'"}
-			default { set more ""}
-		}
-		puts "$id: [time-format $begin]: {$more}"
-	}
+	WHERE end IS NULL;" { puts "$id: [time-format $begin]: {[show-slot $slot $value]}" }
 } {список выполняемых задач}
 
-command-collect stat 0 1 {stat [<filter pattern>]} {
+command-collect ago 0 0 {ago} {
 	db eval "SELECT begin, end - begin AS len, mesg, slot, value 
 	FROM donelog LEFT JOIN slots ON done = begin
 	WHERE end IS NOT NULL AND begin > [expr [clock seconds] - [pamVal cicle]];"  {
-			switch $slot {
-				0 { set more "up:$value"}
-				1 { set more "len:[expr $value/60]'"}
-				default {set more ""}
-			}
-		puts "[expr $len/60]' [time-format $begin] {$more}\n\t $mesg"
+		puts "[expr $len/60]' [time-format $begin] {[show-slot $slot $value]}\n\t $mesg"
 	}
 } {выводит завершенные записи за установренный рабочий цикл}
 
-command-collect parts 1 -1 {parts <pattern> [.. <next pattern>]} {
+command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	set parts [list]
 	foreach patern $adata {
 		lappend parts "SELECT '$patern' AS patern, SUM(end - begin) AS time, COUNT(*) AS num
@@ -197,11 +199,9 @@ command-collect parts 1 -1 {parts <pattern> [.. <next pattern>]} {
 	}
 	puts "Patern\t\t\tTime, h\tTime/a\tNumber\tNum/a"
 	set parts [join $parts "\nUNION\n"]
-
 	set total [db eval "SELECT SUM(time), SUM(num) FROM ($parts)"]
 	set total-time [lindex $total 0]
 	set total-num [lindex $total 1]
-
 	db eval "SELECT patern, time, num FROM ($parts)" {
 		puts "\t$patern\t\t[expr $time/3600]\t[expr $time/${total-time}]\t$num\t[expr $num/${total-time}]"
 	}
