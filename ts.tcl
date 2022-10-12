@@ -106,9 +106,10 @@ proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 
 	# database 
 	package require sqlite3
-	sqlite db ".db"
+	sqlite db [pamVal database] -create true
 	global MakeBase
 	db eval $MakeBase
+	db function regexp -deterministic {regexp --}
 
 	# execute command
 	if {$args} [lindex $cmd 3] $fail
@@ -198,7 +199,7 @@ about-command {stat [<filter pattern>]}\
 command-collect stat 0 1 {
 	db eval "SELECT begin, end - begin AS len, mesg, slot, value 
 	FROM donelog LEFT JOIN slots ON done = begin
-	WHERE end IS NOT NULL;"  {
+	WHERE end IS NOT NULL AND begin > [expr [clock seconds] - [pamVal cicle]];"  {
 			switch $slot {
 				0 { set more "up:$value"}
 				1 { set more "len:[expr $value/60]'"}
@@ -211,8 +212,26 @@ command-collect stat 0 1 {
 about-command {parts <pattern> [.. <next pattern>]}\
 	{выводит процент шаблона от периода и от других шаблонов (с верменем)}
 command-collect parts 1 -1 {
-	puts [db eval "SELECT *,'\n' FROM donelog LEFT JOIN slots ON done = begin;"]
+	set parts [list]
+	foreach patern $adata {
+		lappend parts "SELECT '$patern' AS patern, SUM(end - begin) AS time, COUNT(*) AS num
+		FROM donelog 
+		WHERE mesg REGEXP '$patern' AND end is not null 
+			AND begin > [expr [clock seconds] - [pamVal cicle]]"
+	}
+	puts "Patern\t\t\tTime, h\tTime/a\tNumber\tNum/a"
+	set parts [join $parts "\nUNION\n"]
+
+	set total [db eval "SELECT SUM(time), SUM(num) FROM ($parts)"]
+	set total-time [lindex $total 0]
+	set total-num [lindex $total 1]
+
+	db eval "SELECT patern, time, num FROM ($parts)" {
+		puts "\t$patern\t\t[expr $time/3600]\t[expr $time/${total-time}]\t$num\t[expr $num/${total-time}]"
+	}
+	puts "Total time: [expr ${total-time}/3600] h."
+	puts "Total count: ${total-num}"
 }
 
-#if {![params-check database] || [llength $CLI_ARGS] == 0} {help-gen; exit}
+if {![params-check database] || [llength $CLI_ARGS] == 0} {help-gen; exit}
 command-exec {help-gen; exit}
