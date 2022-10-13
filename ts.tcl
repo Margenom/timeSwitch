@@ -120,29 +120,21 @@ proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 }
 
 # actions
-command-collect do 0 1 {do [<length, in mins>]} {
+command-collect do 0 -1 {do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]} {
 	set sec [clock seconds]
-	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
-	if [llength $adata] {
-		set len [expr 60*[lindex $adata 0]]
-		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);"
+	if [llength $adata] { db eval "INSERT INTO donelog(begin, mesg) VALUES ($sec, '$adata');"
+	} else { db eval "INSERT INTO donelog(begin) VALUES ($sec);"}
+	set len [expr 60*[pamVal l 0]]
+	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
+	set up [pamVal up 0]
+	if $up {
+		set up [db eval "SELECT begin
+		FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
+			FROM donelog WHERE end IS NULL)
+		WHERE id = $up;"]
+		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 0, $up);"
 	}
-} {запись выполнения нового задания}
-
-command-collect sub 1 1 {sub <id> [<length>]} {
-	set up [db eval "SELECT begin
-	FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
-		FROM donelog WHERE end IS NULL)
-	WHERE id = [lindex $adata 0];"]
-	if [string eq $up ""] exit 
-	set sec [clock seconds]
-	db eval "INSERT INTO donelog(begin) VALUES ($sec);"
-	db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 0, $up);"
-	if {[llength $adata] > 1} {
-		set len [expr 60*[lindex $adata 1]]
-		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);"
-	}
-} {вклинивает задачу как подзадачу выполняемой}
+} {создание нового задания}
 
 command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]} {
 	set sec [clock seconds]
@@ -175,9 +167,9 @@ command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <me
 
 # information
 command-collect wil 0 0 {wil} {
-	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value
+	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value, mesg
 	FROM donelog LEFT JOIN slots ON done = begin
-	WHERE end IS NULL;" { puts "$id: [time-format $begin]: {[show-slot $slot $value]}" }
+	WHERE end IS NULL;" { puts "$id: [time-format $begin]: {[show-slot $slot $value]} $mesg" }
 } {список выполняемых задач}
 
 command-collect ago 0 0 {ago} {
