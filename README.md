@@ -6,10 +6,8 @@
 
 # Commands
 
-		запись выполнения нового задания
-	do [<length, in mins>]
-		вклинивает задачу как подзадачу выполняемой
-	sub <id> [<length>]
+		создание нового задания
+	do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]
 		завершает задачу
 	end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]
 		отмечает время от конца последней завершенной задачи как повую задачу
