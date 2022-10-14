@@ -1,7 +1,7 @@
 #!/usr/bin/tclsh
 # timeSwitch v0.7: System for mark time segments
 # Copyright (C) 2022 Daniil Shvachkin margenom@ya.ru
-# Released under the terms of the General Public License version 2.0
+# Released under the terms of the GNU General Public License version 2.0
 #
 # Из ошибок предидущих версий я понял зачем может пригодиться много задачность в таком деле и вот
 # есть у меня план прочесть книгу за месяц и я могу отмечать что я чтото там читал но это всё было как часть
