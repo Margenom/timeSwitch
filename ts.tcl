@@ -1,5 +1,5 @@
 #!/usr/bin/tclsh
-# timeSwitcher v0.7: System for mark time segments
+# timeSwitch v0.7: System for mark time segments
 # Copyright (C) 2022 Daniil Shvachkin margenom@ya.ru
 # Released under the terms of the General Public License version 2.0
 #
