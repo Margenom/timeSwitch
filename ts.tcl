@@ -124,17 +124,23 @@ command-collect do 0 -1 {do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <n
 	set sec [clock seconds]
 	if [llength $adata] { db eval "INSERT INTO donelog(begin, mesg) VALUES ($sec, '$adata');"
 	} else { db eval "INSERT INTO donelog(begin) VALUES ($sec);"}
-	set len [expr 60*[pamVal l 0]]
-	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
 	set up [pamVal up 0]
-	if $up {
-		set up [db eval "SELECT begin
+	if $up { db eval "INSERT OR IGNORE INTO slots(done, slot, value) 
+		SELECT $sec, 0, begin
 		FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
 			FROM donelog WHERE end IS NULL)
 		WHERE id = $up;"]
-		db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 0, $up);"
 	}
+	set len [expr 60*[pamVal l 0]]
+	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
 } {создание нового задания}
+
+proc _last-len {} {
+	set len [db eval "SELECT (end-begin)/60 FROM donelog 
+	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
+	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
+	puts "Taken $len'"
+}
 
 command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]} {
 	set sec [clock seconds]
@@ -145,24 +151,18 @@ command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <
 	FROM (SELECT row_number() OVER (ORDER BY begin) AS id, begin AS done
 		FROM donelog WHERE end IS NULL)
 	WHERE id = $id AND done = begin;"
-	set len [db eval "SELECT (end-begin)/60 FROM donelog 
-	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
-	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
-	puts "Taken $len'"
+	_last-len
 } {завершает задачу}
 
 command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <mesg> [.. <mesg parts>]} {
-	db eval "INSERT INTO donelog(begin, end, mesg)
+	db eval "INSERT OR IGNORE INTO donelog(begin, end, mesg)
 	SELECT end, strftime('%s'), '$adata'
 	FROM donelog JOIN (SELECT row_number() OVER (ORDER BY begin DESC) AS id, begin AS done
 		FROM donelog
 		WHERE end IS NOT NULL) ON done = begin
 	WHERE id = ([pamVal o 0] +1)
 	ORDER BY begin DESC"
-	set len [db eval "SELECT (end-begin)/60 FROM donelog
-	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
-	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
-	puts "Taken $len'"
+	_last-len
 } {отмечает время от конца последней завершенной задачи как повую задачу}
 
 # information
