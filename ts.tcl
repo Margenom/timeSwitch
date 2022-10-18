@@ -1,6 +1,6 @@
 #!/usr/bin/tclsh
 # timeSwitch v0.7: System for mark time segments
-# Copyright (C) 2022 Daniil Shvachkin margenom@ya.ru
+# Copyright (C) 2022 Daniil Shvachkin <margenom at ya dot ru>
 # Released under the terms of the GNU General Public License version 2.0
 #
 # Из ошибок предидущих версий я понял зачем может пригодиться много задачность в таком деле и вот
@@ -169,6 +169,10 @@ command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <me
 	_last-len
 } {отмечает время от конца последней завершенной задачи как повую задачу}
 
+#command-collect last 1 -1 {last [-up=<id>] [-l=<length, in mins>] [<mesg> .. <mesg parts>]} {
+#	set len [expr 60*[pamVal l 0]]
+#	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
+#} {модифицирует или дополняет предидущюю запись}
 # information
 command-collect wil 0 0 {wil} {
 	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value, mesg
