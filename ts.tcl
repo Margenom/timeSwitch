@@ -29,7 +29,7 @@ proc pamVal {name {orval false} {convert 0} {empty_val true}} {
 	}
 }
 
-# конфигурация
+### configuration
 set ABOUT ""
 proc about-include {name about {def ""} {defhum ""}} { global ABOUT; global CLI_PARAMS
 	set mval [pamVal $name ""]
@@ -44,7 +44,6 @@ proc about-include {name about {def ""} {defhum ""}} { global ABOUT; global CLI_
 proc about-command {usage about} { global ABOUT; set ABOUT "$ABOUT\t\t$about\n\t$usage\n"; }
 proc about-switch {categ} { global ABOUT; set ABOUT "$ABOUT$categ\n"; }
 
-# configuration
 about-switch "Config"
 about-include database "location of your database" 
 about-include cicle "length of your work cicle (in sec)" [expr 3600*24*7] 
@@ -71,24 +70,6 @@ proc params-check pamlist { set bpam 1; global CLI_PARAMS
 	return $bpam
 }
 
-set MakeBase {
-BEGIN TRANSACTION;
--- special values for donelogs
-CREATE TABLE IF NOT EXISTS "slots" (
-	"done"	INTEGER,
-	"slot"	INTEGER, -- 0: up, 1: length
-	"value" TEXT,
-	FOREIGN KEY("done") REFERENCES "donelog"("begin")
-);
--- log what you do
-CREATE TABLE IF NOT EXISTS "donelog" (
-	"begin"	INTEGER NOT NULL, -- utime
-	"end"	INTEGER, -- utime 
-	"mesg"	TEXT,
-	PRIMARY KEY("begin")
-);
-COMMIT;}
-
 about-switch "Commands"
 set COMMANDS [list]
 
@@ -98,7 +79,7 @@ proc command-collect {name require optional usage body descr} { global COMMANDS
 	about-command $usage $descr
 }
 
-proc command-exec {fail} { global COMMANDS; global CLI_ARGS
+proc command-exec {db fail} { global COMMANDS; global CLI_ARGS
 	set cmd [lsearch -index 0 $COMMANDS [lindex $CLI_ARGS 0]]
 	if {$cmd == -1} $fail 
 
@@ -112,36 +93,29 @@ proc command-exec {fail} { global COMMANDS; global CLI_ARGS
 	# arguments data
 	set adata [lrange $CLI_ARGS 1 end]
 
-	# database 
-	package require sqlite3
-	sqlite db [pamVal database]
-	global MakeBase
-	db eval $MakeBase
-	db function regexp -deterministic {regexp --}
-
 	# execute command
 	if {$args} [lindex $cmd 3] $fail
 }
 
-# actions
+### actions
 command-collect do 0 -1 {do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]} {
 	set sec [clock seconds]
+	# insert task begin
 	if [llength $adata] { db eval "INSERT INTO donelog(begin, mesg) VALUES ($sec, '$adata');"
 	} else { db eval "INSERT INTO donelog(begin) VALUES ($sec);"}
 	set up [pamVal up 0]
 	if $up { db eval "INSERT OR IGNORE INTO slots(done, slot, value) 
-		SELECT $sec, 0, begin
+		SELECT $sec, 0, begin -- 0 is up (mother record) 
 		FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
 			FROM donelog WHERE end IS NULL)
-		WHERE id = $up;"]
-	}
+		WHERE id = $up;" }
 	set len [expr 60*[pamVal l 0]]
-	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
+	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, '$len');" }
 } {создание нового задания}
 
-proc _last-len {} {
+proc last-len {db} {
 	set len [db eval "SELECT (end-begin)/60 FROM donelog 
-	WHERE end IS NOT NULL ORDER BY begin DESC LIMIT 1;"]
+	WHERE end IS NOT NULL ORDER BY end DESC LIMIT 1;"]
 	if {![params-check m]} {notify-send "timeSwitcher" "Taken $len"}
 	puts "Taken $len'"
 }
@@ -155,10 +129,10 @@ command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <
 	FROM (SELECT row_number() OVER (ORDER BY begin) AS id, begin AS done
 		FROM donelog WHERE end IS NULL)
 	WHERE id = $id AND done = begin;"
-	_last-len
+	last-len db
 } {завершает задачу}
 
-command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <mesg> [.. <mesg parts>]} {
+command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset >=0, def 0>] <mesg> [.. <mesg parts>]} {
 	db eval "INSERT OR IGNORE INTO donelog(begin, end, mesg)
 	SELECT end, strftime('%s'), '$adata'
 	FROM donelog JOIN (SELECT row_number() OVER (ORDER BY begin DESC) AS id, begin AS done
@@ -166,14 +140,9 @@ command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset>] <me
 		WHERE end IS NOT NULL) ON done = begin
 	WHERE id = ([pamVal o 0] +1)
 	ORDER BY begin DESC"
-	_last-len
+	last-len db
 } {отмечает время от конца последней завершенной задачи как повую задачу}
 
-#command-collect last 1 -1 {last [-up=<id>] [-l=<length, in mins>] [<mesg> .. <mesg parts>]} {
-#	set len [expr 60*[pamVal l 0]]
-#	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, $len);" }
-#} {модифицирует или дополняет предидущюю запись}
-# information
 command-collect wil 0 0 {wil} {
 	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value, mesg
 	FROM donelog LEFT JOIN slots ON done = begin
@@ -208,5 +177,28 @@ command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	puts "Total count: ${total-num}"
 } {выводит процент шаблона от периода и от других шаблонов (с верменем)}
 
+### database 
+package require sqlite3
+# check database parameter
 if [params-check database] {help-gen; exit}
-command-exec {help-gen; exit}
+sqlite db [pamVal database]
+db function regexp -deterministic {regexp --}
+## create database tables
+db eval { BEGIN TRANSACTION;
+-- special values for donelogs
+CREATE TABLE IF NOT EXISTS "slots" (
+	"done"	INTEGER,
+	"slot"	INTEGER, -- 0: up, 1: length
+	"value" TEXT,
+	FOREIGN KEY("done") REFERENCES "donelog"("begin")
+);
+-- log what you do
+CREATE TABLE IF NOT EXISTS "donelog" (
+	"begin"	INTEGER NOT NULL, -- utime
+	"end"	INTEGER, -- utime 
+	"mesg"	TEXT,
+	PRIMARY KEY("begin")
+);
+COMMIT;}
+
+command-exec db {help-gen; exit}
