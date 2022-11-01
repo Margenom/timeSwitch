@@ -1,5 +1,5 @@
 #!/usr/bin/tclsh
-# timeSwitch v0.7: System for mark time segments
+# timeSwitch v0.8: System for mark time segments
 # Copyright (C) 2022 Daniil Shvachkin <margenom at ya dot ru>
 # Released under the terms of the GNU General Public License version 2.0
 #
@@ -51,14 +51,6 @@ about-include timeformat "print time format" "%a %d.%m (%Y) %H:%M {%s}"
 proc time-format {timesec} { return [clock format $timesec -format [pamVal timeformat]]}
 #about-include timescan "user scan time format" "%Y%m%d%H%M"
 #proc time-format-scan {timeline} { return [clock scan $timeline -format [pamVal timescan]]}
-proc show-slot {slot value} {
-	switch $slot {
-		0 { return "up:$value"}
-		1 { return "len:[expr $value/60]'"}
-		default {return ""}
-	}
-}
-proc notify-send {title mesg} { exec notify-send $title $mesg}
 
 proc help-gen {} {global ABOUT; puts $ABOUT}
 # req_params is list of names required params
@@ -98,12 +90,12 @@ proc command-exec {db fail} { global COMMANDS; global CLI_ARGS
 }
 
 ### actions
-command-collect do 0 -1 {do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]} {
+command-collect do 0 -1 {do [-u=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]} {
 	set sec [clock seconds]
 	# insert task begin
 	if [llength $adata] { db eval "INSERT INTO donelog(begin, mesg) VALUES ($sec, '$adata');"
 	} else { db eval "INSERT INTO donelog(begin) VALUES ($sec);"}
-	set up [pamVal up 0]
+	set up [pamVal u 0]
 	if $up { db eval "INSERT OR IGNORE INTO slots(done, slot, value) 
 		SELECT $sec, 0, begin -- 0 is up (mother record) 
 		FROM ( SELECT row_number() OVER (ORDER BY begin) AS id, begin
@@ -111,7 +103,7 @@ command-collect do 0 -1 {do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <n
 		WHERE id = $up;" }
 	set len [expr 60*[pamVal l 0]]
 	if $len { db eval "INSERT INTO slots(done, slot, value) VALUES ($sec, 1, '$len');" }
-} {создание нового задания}
+} {create new task}
 
 proc last-len {db} {
 	set len [db eval "SELECT (end-begin)/60 FROM donelog 
@@ -130,7 +122,7 @@ command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <
 		FROM donelog WHERE end IS NULL)
 	WHERE id = $id AND done = begin;"
 	last-len db
-} {завершает задачу}
+} {end task by id}
 
 command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset >=0, def 0>] <mesg> [.. <mesg parts>]} {
 	db eval "INSERT OR IGNORE INTO donelog(begin, end, mesg)
@@ -141,28 +133,45 @@ command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset >=0, 
 	WHERE id = ([pamVal o 0] +1)
 	ORDER BY begin DESC"
 	last-len db
-} {отмечает время от конца последней завершенной задачи как повую задачу}
+} {append task next by last complited task (with offset)}
+
+proc show-slot {slots} {
+	set ret {} 
+	foreach _s [split $slots "|"] {
+		set s [split $_s ":"]
+		set val [lindex $s 1]
+		switch [lindex $s 0] {
+			0 { lappend ret "up:$val"}
+			1 { lappend ret "len:[expr $val/60]'"}
+		default {append ""}
+		}
+	}
+	return [join $ret " "]
+}
+proc notify-send {title mesg} { exec notify-send $title $mesg}
 
 command-collect wil 0 0 {wil} {
-	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, slot, value, mesg
+	db eval "SELECT row_number() OVER (ORDER BY begin) AS id, begin, mesg, group_concat(slot || ':' || value, '|') as slot
 	FROM donelog LEFT JOIN slots ON done = begin
-	WHERE end IS NULL;" { puts "$id: [time-format $begin]: {[show-slot $slot $value]} $mesg" }
-} {список выполняемых задач}
+	WHERE end IS NULL GROUP BY begin, mesg;" { 
+		puts "$id: [time-format $begin]: {[show-slot $slot]} $mesg" }
+} {list tasks in process}
 
 command-collect ago 0 0 {ago} {
-	db eval "SELECT begin, end - begin AS len, mesg, slot, value 
+	db eval "SELECT begin, end - begin AS len, mesg, group_concat(slot || ':' || value, '|') as slot
 	FROM donelog LEFT JOIN slots ON done = begin
-	WHERE end IS NOT NULL AND begin > [expr [clock seconds] - [pamVal cicle]];"  {
-		puts "[expr $len/60]' [time-format $begin] {[show-slot $slot $value]}\n\t $mesg"
+	WHERE end IS NOT NULL AND begin > [expr [clock seconds] - [pamVal cicle]]
+	GROUP BY begin, len, mesg;"  {
+		puts "[expr $len/60]' [time-format $begin] {[show-slot $slot]}\n\t $mesg"
 	}
-} {выводит завершенные записи за установренный рабочий цикл}
+} {list complited tasks in current cicle}
 
 command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	set parts [list]
-	foreach patern $adata {
-		lappend parts "SELECT '$patern' AS patern, SUM(end - begin) AS time, COUNT(*) AS num
+	foreach pattern $adata {
+		lappend parts "SELECT '$pattern' AS patern, SUM(end - begin) AS time, COUNT(*) AS num
 		FROM donelog 
-		WHERE mesg REGEXP '$patern' AND end is not null 
+		WHERE mesg REGEXP '$pattern' AND end is not null 
 			AND begin > [expr [clock seconds] - [pamVal cicle]]"
 	}
 	puts "Patern\t\t\tTime, h\tTime/a\tNumber\tNum/a"
@@ -175,14 +184,16 @@ command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	}
 	puts "Total time: [expr ${total-time}/3600] h."
 	puts "Total count: ${total-num}"
-} {выводит процент шаблона от периода и от других шаблонов (с верменем)}
+} {show some statistic by pattern in completed tasks into current cicle}
+
+# check database parameter
+if [params-check database] {help-gen; exit}
 
 ### database 
 package require sqlite3
-# check database parameter
-if [params-check database] {help-gen; exit}
 sqlite db [pamVal database]
 db function regexp -deterministic {regexp --}
+
 ## create database tables
 db eval { BEGIN TRANSACTION;
 -- special values for donelogs
