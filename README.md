@@ -6,16 +6,16 @@
 
 # Commands
 
-		создание нового задания
-	do [-up=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]
-		завершает задачу
+		create new task
+	do [-u=<id>] [-l=<length, in mins>] [<temp name> .. <name parts>]
+		end task by id
 	end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]
-		отмечает время от конца последней завершенной задачи как повую задачу
-	app [-n notification] [-g gui input] [-o=<offset>] <mesg> [.. <mesg parts>]
-		список выполняемых задач
+		append task next by last complited task (with offset)
+	app [-n notification] [-g gui input] [-o=<offset >=0, def 0>] <mesg> [.. <mesg parts>]
+		list tasks in process
 	wil
-		выводит завершенные записи за установренный рабочий цикл
+		list complited tasks in current cicle
 	ago
-		выводит процент шаблона от периода и от других шаблонов (с верменем)
+		show some statistic by pattern in completed tasks into current cicle
 	stat <pattern> [.. <next pattern>]
 
