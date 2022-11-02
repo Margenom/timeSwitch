@@ -166,6 +166,37 @@ command-collect ago 0 0 {ago} {
 	}
 } {list complited tasks in current cicle}
 
+command-collect last 1 0 {last <s-len|s-up|beg|end|len|mesg> [-w skip will] [-a skip ago] [-o=<offset>]} {
+proc slot-ref {slots sid} {
+	set out {}
+	foreach _s [split $slots ":"] {
+		set s [split $_s "|"]
+		if [expr [lindex $s 0] == $sid] {set out [lindex $s 1]}
+	}
+	if [string eq $out {}] {return {}} {return $out}
+}
+proc rec-type {} {
+		if [pamVal w] {return {WHERE end IS NOT NULL}}
+		if [pamVal a] {return {WHERE end IS NULL}}
+		return ""}
+	db eval "SELECT id, begin, end, mesg, group_concat(slot || '|' || value, ':') as slots
+	FROM donelog JOIN (
+		SELECT row_number() OVER (ORDER BY begin DESC) AS id, begin AS beg
+		FROM donelog [rec-type]) ON beg = begin
+			LEFT JOIN slots ON done = begin
+	WHERE id = ([pamVal o 0] +1) 
+	GROUP BY id, begin, end;" {switch $adata {
+		s-len {puts [slot-ref $slots 1]}
+		s-up {puts [slot-ref $slots 0]}
+		len {if [string eq $end ""] {puts "-1"} {puts [expr $end - $begin]}}
+		end {puts $end}
+		beg {puts $begin}
+		mesg {puts $mesg}
+		default {}
+		
+	} }
+} {show information about last task (with offset)}
+
 command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	set parts [list]
 	foreach pattern $adata {
