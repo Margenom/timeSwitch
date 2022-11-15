@@ -115,7 +115,10 @@ proc last-len {db} {
 command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <mesg parts>]} {
 	set sec [clock seconds]
 	set id [lindex $adata 0]
-	set mesg [lrange $adata 1 end]
+	if [pamVal g] {
+		package require Tk
+		set mesg "test gui"
+	} else {set mesg [lrange $adata 1 end]}
 	db eval "UPDATE OR IGNORE donelog
 	SET mesg = '$mesg', end = $sec
 	FROM (SELECT row_number() OVER (ORDER BY begin) AS id, begin AS done
@@ -125,6 +128,10 @@ command-collect end 2 -1 {end [-g gui input] [-n notification] <id> <mesg> [.. <
 } {end task by id}
 
 command-collect app 1 -1 {app [-n notification] [-g gui input] [-o=<offset >=0, def 0>] <mesg> [.. <mesg parts>]} {
+	if [pamVal g] {
+		package require Tk
+		set adata "test gui"
+	}
 	db eval "INSERT OR IGNORE INTO donelog(begin, end, mesg)
 	SELECT end, strftime('%s'), '$adata'
 	FROM donelog JOIN (SELECT row_number() OVER (ORDER BY begin DESC) AS id, begin AS done
@@ -217,6 +224,41 @@ command-collect stat 1 -1 {stat <pattern> [.. <next pattern>]} {
 	puts "Total count: ${total-num}"
 } {show some statistic by pattern in completed tasks into current cicle}
 
+command-collect dump 1 1 {dump <output-file> [<time-from>] [-will show will only]} {
+	set dump [open [lindex $adata 0] w]
+	set filter ""
+	if [pamVal will] {set will ""} else {set will NOT}
+	if {[llength $adata] > 1} {set filter "AND begin >= [lindex $adata 1]"}
+	db eval "SELECT begin, end,
+		'{' || mesg || '}' AS mesg,
+		group_concat('{' || slot || ' ' || value || '}', '\t') AS slots
+	FROM donelog 	LEFT JOIN slots ON done = begin 
+	WHERE end IS $will NULL $filter 
+	GROUP BY begin, end, mesg;" { puts [join [list "{$begin $end}" $mesg $slots] "\t"] }
+	close $dump
+} {dump complited records from time (as utime) to dsv file}
+
+command-collect load 1 0 {load <dump-file> [<fime-from>] [-new only new records]} {
+	set dump [open [lindex $adata 0] r]
+	set last 0
+	if [pamVal new] { set last [db eval "SELECT begin FROM donelog ORDER BY end DESC LIMIT 1;"]}
+	if {[llength $adata] > 1} {set last [lindex $adata 1]}
+	while {[gets $dump ln] > 0} {
+		set begin [lindex $ln 0]
+		set end [lindex $begin 1]
+		set begin [lindex $begin 0]
+		if {$begin <= $last} continue
+		set mesg [lindex $ln 1]
+		db eval {INSERT INTO donelog(begin, end, mesg) VALUES ($begin, $end, $mesg);}
+		set slots [lrange $ln 2 end]
+		foreach slot $slots {
+			set key [lindex $slot 0]
+			set val [lindex $slot 1]
+			db eval {INSERT INTO slots(done, slot, value) VALUES($begin, $key, $val);}
+		}
+	}
+	close $dump
+} {load dump records to database}
 # check database parameter
 if [params-check database] {help-gen; exit}
 
